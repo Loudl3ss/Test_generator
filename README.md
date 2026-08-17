@@ -5,9 +5,9 @@ Sveiki atvykę į **InfoQuiz**! Tai išmani programa, leidžianti automatiškai 
 ## 📥 Kaip atsisiųsti programą (Windows)?
 
 Jau paruoštą ir ištestuotą „Windows“ programos versiją galite atsisiųsti iš mūsų GitHub repozitorijos:
-1. Eikite į repozitorijos **Releases** skiltį (dešinėje pusėje).
-2. Arba atsisiųskite [InfoQuiz-Windows.zip](InfoQuiz-Windows.zip) tiesiogiai iš failų sąrašo.
-3. Atsisiuntę `.zip` failą, išskleiskite jį savo kompiuteryje (dešiniu pelės mygtuku paspauskite ant failo ir pasirinkite *Extract all...* arba *Išskleisti viską...*).
+1. Eikite į repozitorijos **Releases** skiltį (dešinėje pusėje esanti nuoroda „Releases“ arba „Latest“ ženkliukas).
+2. Atsidariusiame puslapyje, ties skyreliu „Assets“, suraskite ir atsisiųskite failą **`InfoQuiz-Windows.zip`**.
+3. Atsisiuntę `.zip` failą, išskleiskite jį savo kompiuteryje (dešiniuoju pelės mygtuku paspauskite ant failo ir pasirinkite *Extract all...* arba *Išskleisti viską...*).
 4. **SVARBU:** Atidarykite išskleistą aplanką, suraskite failą **`Paleisti.bat`** (gali būti pavadintas tiesiog `Paleisti`, jei jūsų kompiuteris slepia failų galūnes) ir dukart ant jo paspauskite. Šis failas automatiškai atidarys programą jūsų interneto naršyklėje!
 
 ---
@@ -36,15 +36,15 @@ Kad programa galėtų analizuoti infografikus ir kurti testus, jai reikalingas n
 
 ## 📚 3. Žingsnis: Kaip atsisiųsti 5 kl. infografikus?
 
-Šioje repozitorijoje jau yra paruošti infografikai 5 klasės mokiniams. Juos rasite šiuose archyvuose:
-- `Gamtos mokslai 5kl.zip`
-- `Istorija 5kl.zip`
-- `Matematika 5kl.zip`
+Kartu su programos leidimu esame paruošę infografikus 5 klasės mokiniams. Juos rasite ten pat, kur ir pačią programą:
 
 **Kaip juos atsisiųsti ir naudoti:**
-1. Šiame „GitHub“ puslapyje paspauskite ant norimo `.zip` failo (pavyzdžiui, `Istorija 5kl.zip`).
-2. Atsidariusiame puslapyje paspauskite mygtuką **„Download“** (arba *Raw*), kad atsisiųstumėte failą į savo kompiuterį.
-3. Kompiuteryje (dažniausiai „Atsisiuntimai“ aplanke) dešiniuoju pelės mygtuku paspauskite ant atsiųsto `.zip` failo ir pasirinkite **„Išskleisti viską“** (*Extract all*). Viduje rasite paveikslėlių failus (infografikus).
+1. Vėl eikite į „GitHub“ repozitorijos **Releases** skiltį.
+2. Ties skyreliu „Assets“ suraskite ir atsisiųskite šiuos failus į savo kompiuterį:
+   - `Gamtos mokslai 5kl.zip`
+   - `Istorija 5kl.zip`
+   - `Matematika 5kl.zip`
+3. Kompiuteryje (dažniausiai „Atsisiuntimai“ aplanke) dešiniuoju pelės mygtuku paspauskite ant kiekvieno atsiųsto `.zip` failo ir pasirinkite **„Išskleisti viską“** (*Extract all*). Viduje rasite paveikslėlių failus (infografikus).
 
 ---
 
