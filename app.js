@@ -84,8 +84,6 @@ const elements = {
     loadingStatusText: document.getElementById('loading-status-text'),
 
     // Quiz View
-    quizInfographic: document.getElementById('quiz-infographic'),
-    toggleZoomBtn: document.getElementById('toggle-zoom-btn'),
     quizSubjectBadge: document.getElementById('quiz-subject-badge'),
     currentQuestionNum: document.getElementById('current-question-num'),
     totalQuestionsNum: document.getElementById('total-questions-num'),
@@ -252,8 +250,6 @@ function setupEventListeners() {
 
     // Quiz flow buttons
     elements.nextQuestionBtn.addEventListener('click', () => handleNextQuestion());
-    elements.toggleZoomBtn.addEventListener('click', () => openZoomModal());
-    elements.quizInfographic.addEventListener('click', () => openZoomModal());
     elements.selectedPreviewImage.addEventListener('click', () => openZoomModal());
     elements.closeZoomBtn.addEventListener('click', () => closeZoomModal());
     
@@ -975,7 +971,6 @@ function startQuiz() {
     state.userAnswers = new Array(state.questions.length).fill(null);
     
     // Set UI elements
-    elements.quizInfographic.src = state.activeInfographic.imageSrc;
     elements.quizSubjectBadge.textContent = `${state.activeInfographic.code} — ${state.activeInfographic.subject}`;
     elements.totalQuestionsNum.textContent = state.questions.length;
     
