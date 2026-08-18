@@ -5,8 +5,6 @@ const state = {
     apiKey: localStorage.getItem('infoquiz_api_key') || '',
     
     // Test Select Tab state
-    selectedInfographicCode: '',
-    selectedInfographicId: '',
     testSelectedSubject: 'Matematika',
     
     // Library Tab Form state
@@ -140,49 +138,25 @@ function openDB() {
     });
 }
 
-async function saveInfographicToDB(infographic) {
+const withStore = async (mode, fn) => {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readwrite");
-        const store = tx.objectStore(storeName);
-        store.put(infographic);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
+        const store = db.transaction(storeName, mode).objectStore(storeName);
+        const req = fn(store);
+        if (req) {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        } else {
+            store.transaction.oncomplete = () => resolve();
+            store.transaction.onerror = () => reject(store.transaction.error);
+        }
     });
-}
+};
 
-async function getAllInfographicsFromDB() {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readonly");
-        const store = tx.objectStore(storeName);
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function getInfographicFromDB(id) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readonly");
-        const store = tx.objectStore(storeName);
-        const request = store.get(id);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-}
-
-async function deleteInfographicFromDB(id) {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, "readwrite");
-        const store = tx.objectStore(storeName);
-        store.delete(id);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-    });
-}
+const saveInfographicToDB = o => withStore('readwrite', s => void s.put(o));
+const getAllInfographicsFromDB = () => withStore('readonly', s => s.getAll());
+const getInfographicFromDB = id => withStore('readonly', s => s.get(id));
+const deleteInfographicFromDB = id => withStore('readwrite', s => void s.delete(id));
 
 /* ==========================================================================
    INITIALIZATION & SETTINGS
@@ -205,11 +179,11 @@ function checkApiKey() {
 
 function setupEventListeners() {
     // Settings modal events
-    elements.settingsBtn.addEventListener('click', () => openSettingsModal());
-    elements.fixApiBtn.addEventListener('click', () => openSettingsModal());
-    elements.closeModalBtn.addEventListener('click', () => closeSettingsModal());
-    elements.cancelSettingsBtn.addEventListener('click', () => closeSettingsModal());
-    elements.saveSettingsBtn.addEventListener('click', () => saveSettings());
+    elements.settingsBtn.addEventListener(', openSettingsModal);
+    elements.fixApiBtn.addEventListener(', openSettingsModal);
+    elements.closeModalBtn.addEventListener(', closeSettingsModal);
+    elements.cancelSettingsBtn.addEventListener(', closeSettingsModal);
+    elements.saveSettingsBtn.addEventListener(', saveSettings);
     
     elements.toggleApiKeyVisibility.addEventListener('click', () => {
         const type = elements.apiKeyInput.type === 'password' ? 'text' : 'password';
@@ -233,7 +207,7 @@ function setupEventListeners() {
     });
 
     // Generate Quiz button click
-    elements.generateBtn.addEventListener('click', () => generateQuiz());
+    elements.generateBtn.addEventListener(', generateQuiz);
 
     // Subject selector in test form (Step 1)
     elements.testSubjectBtns.forEach(btn => {
@@ -249,13 +223,13 @@ function setupEventListeners() {
     });
 
     // Quiz flow buttons
-    elements.nextQuestionBtn.addEventListener('click', () => handleNextQuestion());
-    elements.selectedPreviewImage.addEventListener('click', () => openZoomModal());
-    elements.closeZoomBtn.addEventListener('click', () => closeZoomModal());
+    elements.nextQuestionBtn.addEventListener(', handleNextQuestion);
+    elements.selectedPreviewImage.addEventListener(', openZoomModal);
+    elements.closeZoomBtn.addEventListener(', closeZoomModal);
     
     // Result screen buttons
-    elements.restartBtn.addEventListener('click', () => restartQuiz());
-    elements.goHomeBtn.addEventListener('click', () => goToHome());
+    elements.restartBtn.addEventListener(', startQuiz);
+    elements.goHomeBtn.addEventListener(', goToHome);
     
     elements.toggleReviewBtn.addEventListener('click', () => {
         elements.reviewSection.classList.toggle('hidden');
@@ -295,20 +269,12 @@ function setupEventListeners() {
         e.preventDefault();
         elements.libDropZone.classList.remove('drag-over');
         const files = e.dataTransfer.files;
-        if (files.length === 1) {
-            handleLibraryImageFile(files[0]);
-        } else if (files.length > 1) {
-            handleMultipleLibraryImageFiles(files);
-        }
+        handleLibraryFiles(files);
     });
 
     elements.libFileInput.addEventListener('change', (e) => {
         const files = e.target.files;
-        if (files.length === 1) {
-            handleLibraryImageFile(files[0]);
-        } else if (files.length > 1) {
-            handleMultipleLibraryImageFiles(files);
-        }
+        handleLibraryFiles(files);
     });
 
     elements.libRemoveImageBtn.addEventListener('click', (e) => {
@@ -392,161 +358,129 @@ function parseFilename(filename) {
     return { code, subject };
 }
 
-async function handleMultipleLibraryImageFiles(files) {
-    let successCount = 0;
-    let failedCount = 0;
-    const details = [];
+async function fileToInfographic(file, subject, code) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 60;
+                canvas.height = 60;
+                
+                const size = Math.min(img.width, img.height);
+                const sx = (img.width - size) / 2;
+                const sy = (img.height - size) / 2;
+                ctx.drawImage(img, sx, sy, size, size, 0, 0, 60, 60);
+                
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+                const imageBase64 = e.target.result.split(',')[1];
+                
+                resolve({
+                    id: `${subject}_${code}`,
+                    code: code,
+                    subject: subject,
+                    imageSrc: e.target.result,
+                    imageBase64: imageBase64,
+                    thumbnail: thumbnail,
+                    addedAt: new Date().toISOString()
+                });
+            };
+            img.onerror = () => reject(new Error('Nepavyko įkelti nuotraukos'));
+            img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Klaida skaitant failą'));
+        reader.readAsDataURL(file);
+    });
+}
 
-    // Helper to process a single file as a promise
-    const processFile = (file) => {
-        return new Promise((resolve) => {
+async function handleLibraryFiles(files) {
+    if (files.length === 1) {
+        const file = files[0];
+        if (!file.type.startsWith('image/')) {
+            alert('Įkelkite tik paveikslėlio bylą (PNG, JPG, JPEG, WEBP).');
+            return;
+        }
+
+        const parsed = parseFilename(file.name);
+        elements.libCodeInput.value = parsed.code;
+        state.libSelectedSubject = parsed.subject;
+        
+        elements.libSubjectBtns.forEach(btn => {
+            if (btn.dataset.subject === parsed.subject) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+
+        try {
+            const infographic = await fileToInfographic(file, parsed.subject, parsed.code);
+            state.libUploadedImageSrc = infographic.imageSrc;
+            elements.libImagePreview.src = state.libUploadedImageSrc;
+            elements.libPreviewContainer.classList.remove('hidden');
+            
+            state.libUploadedImageBase64 = infographic.imageBase64;
+            state.libImageThumbnail = infographic.thumbnail;
+            
+            updateLibrarySubmitButtonState();
+        } catch (err) {
+            console.error(err);
+        }
+    } else if (files.length > 1) {
+        let successCount = 0;
+        let failedCount = 0;
+        const details = [];
+
+        const overlay = document.createElement('div');
+        overlay.className = 'import-loading-overlay';
+        overlay.innerHTML = `
+            <div class="import-loading-card">
+                <div class="loading-spinner"></div>
+                <h3>Importuojami infografikai...</h3>
+                <p>Apdorojama: <span id="import-current-index">0</span> iš ${files.length}</p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        for (let i = 0; i < files.length; i++) {
+            document.getElementById('import-current-index').textContent = i + 1;
+            const file = files[i];
+            
             if (!file.type.startsWith('image/')) {
                 failedCount++;
                 details.push(`${file.name}: Netinkamas failo tipas`);
-                resolve();
-                return;
+                continue;
             }
 
             const parsed = parseFilename(file.name);
-            const reader = new FileReader();
-            
-            reader.onload = function (e) {
-                const img = new Image();
-                img.onload = async function() {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = 60;
-                        canvas.height = 60;
-                        
-                        const size = Math.min(img.width, img.height);
-                        const sx = (img.width - size) / 2;
-                        const sy = (img.height - size) / 2;
-                        ctx.drawImage(img, sx, sy, size, size, 0, 0, 60, 60);
-                        const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-                        
-                        const imageBase64 = e.target.result.split(',')[1];
-                        
-                        const newInfographic = {
-                            id: `${parsed.subject}_${parsed.code}`,
-                            code: parsed.code,
-                            subject: parsed.subject,
-                            imageSrc: e.target.result,
-                            imageBase64: imageBase64,
-                            thumbnail: thumbnail,
-                            addedAt: new Date().toISOString()
-                        };
-                        
-                        await saveInfographicToDB(newInfographic);
-                        successCount++;
-                        details.push(`✔️ ${file.name} -> Kodas: ${parsed.code} (${parsed.subject})`);
-                        resolve();
-                    } catch (err) {
-                        failedCount++;
-                        details.push(`❌ ${file.name}: Klaida saugant (${err.message})`);
-                        resolve();
-                    }
-                };
-                img.onerror = () => {
-                    failedCount++;
-                    details.push(`❌ ${file.name}: Nepavyko įkelti nuotraukos`);
-                    resolve();
-                };
-                img.src = e.target.result;
-            };
-            
-            reader.onerror = () => {
+            try {
+                const infographic = await fileToInfographic(file, parsed.subject, parsed.code);
+                // Dedupe: silently overwrites same subject+code
+                await saveInfographicToDB(infographic);
+                successCount++;
+                details.push(`✔️ ${file.name} -> Kodas: ${parsed.code} (${parsed.subject})`);
+            } catch (err) {
                 failedCount++;
-                details.push(`❌ ${file.name}: Klaida skaitant failą`);
-                resolve();
-            };
-            
-            reader.readAsDataURL(file);
-        });
-    };
-
-    // Show loading indicator
-    const overlay = document.createElement('div');
-    overlay.className = 'import-loading-overlay';
-    overlay.innerHTML = `
-        <div class="import-loading-card">
-            <div class="loading-spinner"></div>
-            <h3>Importuojami infografikai...</h3>
-            <p>Apdorojama: <span id="import-current-index">0</span> iš ${files.length}</p>
-        </div>
-    `;
-    document.body.appendChild(overlay);
-
-    for (let i = 0; i < files.length; i++) {
-        document.getElementById('import-current-index').textContent = i + 1;
-        await processFile(files[i]);
-    }
-
-    // Remove overlay
-    document.body.removeChild(overlay);
-
-    // Refresh library and test list
-    await renderLibraryTab();
-    await renderTestSelectionTab();
-
-    // Show summary dialog
-    alert(`Importavimas baigtas!\n\nSėkmingai importuota: ${successCount}\nNepavyko: ${failedCount}\n\nDetali ataskaita:\n${details.join('\n')}`);
-}
-
-function handleLibraryImageFile(file) {
-    if (!file.type.startsWith('image/')) {
-        alert('Įkelkite tik paveikslėlio bylą (PNG, JPG, JPEG, WEBP).');
-        return;
-    }
-
-    // Autofill code and subject from filename
-    const parsed = parseFilename(file.name);
-    elements.libCodeInput.value = parsed.code;
-    state.libSelectedSubject = parsed.subject;
-    
-    // Highlight parsed subject button
-    elements.libSubjectBtns.forEach(btn => {
-        if (btn.dataset.subject === parsed.subject) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
+                details.push(`❌ ${file.name}: Klaida saugant (${err.message})`);
+            }
         }
-    });
 
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        state.libUploadedImageSrc = e.target.result;
-        elements.libImagePreview.src = state.libUploadedImageSrc;
-        elements.libPreviewContainer.classList.remove('hidden');
-        
-        // Extract raw base64 string for Gemini API
-        state.libUploadedImageBase64 = e.target.result.split(',')[1];
-        
-        // Create 60x60 square thumbnail for database
-        createLibraryThumbnail(state.libUploadedImageSrc);
-    };
-    reader.readAsDataURL(file);
+        document.body.removeChild(overlay);
+        await renderLibraryTab();
+        await renderTestSelectionTab();
+        alert(`Importavimas baigtas!
+
+Sėkmingai importuota: ${successCount}
+Nepavyko: ${failedCount}
+
+Detali ataskaita:
+${details.join('
+')}`);
+    }
 }
 
-function createLibraryThumbnail(src) {
-    const img = new Image();
-    img.onload = function() {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 60;
-        canvas.height = 60;
-        
-        // Square centered crop
-        const size = Math.min(img.width, img.height);
-        const sx = (img.width - size) / 2;
-        const sy = (img.height - size) / 2;
-        
-        ctx.drawImage(img, sx, sy, size, size, 0, 0, 60, 60);
-        state.libImageThumbnail = canvas.toDataURL('image/jpeg', 0.8);
-        updateLibrarySubmitButtonState();
-    };
-    img.src = src;
-}
 
 function clearLibraryUploadedImage() {
     state.libUploadedImageBase64 = '';
@@ -667,7 +601,7 @@ async function renderLibraryTab() {
                     const codeToDelete = e.currentTarget.dataset.code;
                     if (confirm(`Ar tikrai norite ištrinti infografiką „${codeToDelete}“ iš bibliotekos?`)) {
                         await deleteInfographicFromDB(idToDelete);
-                        if (state.selectedInfographicId === idToDelete) {
+                        if (state.activeInfographic?.id === idToDelete) {
                             clearSelectedInfographicPreview();
                         }
                         await renderLibraryTab();
@@ -723,7 +657,7 @@ async function renderTestSelectionTab() {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'infographic-select-btn';
-            if (state.selectedInfographicId === item.id) {
+            if (state.activeInfographic?.id === item.id) {
                 btn.classList.add('active');
             }
             btn.dataset.id = item.id;
@@ -746,10 +680,10 @@ async function renderTestSelectionTab() {
         });
 
         // Re-evaluate current selection just in case
-        if (state.selectedInfographicId) {
-            const selectedExists = items.some(i => i.id === state.selectedInfographicId);
+        if (state.activeInfographic?.id) {
+            const selectedExists = items.some(i => i.id === state.activeInfographic?.id);
             if (selectedExists) {
-                await selectInfographicForTest(state.selectedInfographicId);
+                await selectInfographicForTest(state.activeInfographic?.id);
             } else {
                 clearSelectedInfographicPreview();
             }
@@ -764,13 +698,11 @@ async function renderTestSelectionTab() {
 }
 
 async function selectInfographicForTest(id) {
-    state.selectedInfographicId = id;
     
     try {
         const infographic = await getInfographicFromDB(id);
         if (infographic) {
             state.activeInfographic = infographic;
-            state.selectedInfographicCode = infographic.code;
             
             // Render preview
             elements.selectedPreviewImage.src = infographic.imageSrc;
@@ -788,8 +720,6 @@ async function selectInfographicForTest(id) {
 }
 
 function clearSelectedInfographicPreview() {
-    state.selectedInfographicId = '';
-    state.selectedInfographicCode = '';
     state.activeInfographic = null;
     elements.previewPlaceholderPrompt.classList.remove('hidden');
     elements.selectedPreviewContainer.classList.add('hidden');
@@ -798,7 +728,7 @@ function clearSelectedInfographicPreview() {
 }
 
 function updateGenerateButtonState() {
-    if (state.apiKey && state.selectedInfographicId && state.activeInfographic) {
+    if (state.apiKey && state.activeInfographic?.id && state.activeInfographic) {
         elements.generateBtn.removeAttribute('disabled');
     } else {
         elements.generateBtn.setAttribute('disabled', 'true');
@@ -1225,25 +1155,10 @@ function renderHistory() {
    NAVIGATION & ACTIONS
    ========================================================================== */
 function switchScreen(screenName) {
-    elements.configScreen.classList.add('hidden');
-    elements.loadingScreen.classList.add('hidden');
-    elements.quizScreen.classList.add('hidden');
-    elements.resultScreen.classList.add('hidden');
-
-    if (screenName === 'config') {
-        elements.configScreen.classList.remove('hidden');
-    } else if (screenName === 'loading') {
-        elements.loadingScreen.classList.remove('hidden');
-    } else if (screenName === 'quiz') {
-        elements.quizScreen.classList.remove('hidden');
-    } else if (screenName === 'result') {
-        elements.resultScreen.classList.remove('hidden');
-    }
+    ['config', 'loading', 'quiz', 'result'].forEach(n =>
+        elements[`${n}Screen`].classList.toggle('hidden', n !== screenName));
 }
 
-function restartQuiz() {
-    startQuiz();
-}
 
 function goToHome() {
     switchScreen('config');
@@ -1281,14 +1196,7 @@ function escapeHTML(str) {
     );
 }
 
-function formatDate(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    const hr = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    return `${y}-${m}-${d} ${hr}:${min}`;
-}
+const formatDate = d => d.toLocaleString('lt-LT', { dateStyle: 'short', timeStyle: 'short' });
 
 // Load App
 document.addEventListener('DOMContentLoaded', init);
