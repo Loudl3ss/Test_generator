@@ -53,7 +53,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-primary);
     min-height: 100vh;
@@ -134,7 +134,7 @@ body {
    TYPOGRAPHY
    ========================================================================== */
 h1, h2, h3, h4, .logo-text {
-    font-family: 'Outfit', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-weight: 700;
     letter-spacing: -0.02em;
 }
@@ -256,7 +256,7 @@ h2 {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
-    font-family: 'Inter', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-weight: 600;
     font-size: 0.95rem;
     padding: 0.75rem 1.5rem;
@@ -781,7 +781,7 @@ h2 {
     padding: 1.1rem 1.5rem;
     color: var(--text-primary);
     font-size: 1rem;
-    font-family: 'Inter', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition-normal);
@@ -967,7 +967,7 @@ h2 {
 }
 
 .score-percent {
-    font-family: 'Outfit', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-size: 2.1rem;
     font-weight: 800;
     line-height: 1;
@@ -1394,7 +1394,7 @@ h2 {
     padding: 0.8rem 1.75rem;
     font-size: 1rem;
     font-weight: 600;
-    font-family: 'Outfit', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     border-radius: var(--radius-md);
     cursor: pointer;
     transition: all var(--transition-normal);
@@ -1468,7 +1468,7 @@ h2 {
 }
 
 .select-btn-code {
-    font-family: 'Outfit', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-size: 1.15rem;
     font-weight: 700;
 }
@@ -1619,7 +1619,7 @@ h2 {
 }
 
 .lib-card-code {
-    font-family: 'Outfit', sans-serif;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-weight: 700;
     font-size: 1.1rem;
     color: white;
@@ -1745,3 +1745,46 @@ h2 {
 }
 
 /* Spinner */
+
+/* Import Review Modal Styles */
+.import-review-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+}
+.review-thumb {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    flex-shrink: 0;
+}
+.review-filename {
+    flex: 1;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 150px;
+}
+.review-inputs {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+}
+.review-inputs input,
+.review-inputs select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+.review-inputs select { width: 160px; }
+.review-inputs input { width: 80px; text-align: center; }

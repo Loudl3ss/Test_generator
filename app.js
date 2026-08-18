@@ -124,10 +124,9 @@ function openDB() {
         const request = indexedDB.open(dbName, 2);
         request.onupgradeneeded = function(e) {
             const db = e.target.result;
-            if (db.objectStoreNames.contains(storeName)) {
-                db.deleteObjectStore(storeName);
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName, { keyPath: "id" });
             }
-            db.createObjectStore(storeName, { keyPath: "id" });
         };
         request.onsuccess = function(e) {
             resolve(e.target.result);
@@ -329,32 +328,33 @@ function saveSettings() {
 /* ==========================================================================
    LIBRARY TAB LOGIC
    ========================================================================== */
-function parseFilename(filename) {
-    // Remove extension
+function parseFilename(file) {
+    const filename = file.name || file; // fallback if string is passed
     const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
     
-    // Parse subject
-    let subject = state.libSelectedSubject; // Default to currently selected subject in form
-    const lower = nameWithoutExt.toLowerCase();
-    if (lower.includes('mat')) {
-        subject = 'Matematika';
-    } else if (lower.includes('gam') || lower.includes('mok') || lower.includes('nat')) {
-        subject = 'Gamtos mokslai';
-    } else if (lower.includes('ist') || lower.includes('his')) {
-        subject = 'Istorija';
+    let subject = state.libSelectedSubject;
+    const SUBJECT_PATTERNS = [
+        [/\bmatematik/i, 'Matematika'],
+        [/\b(gamtos|gamta)\b/i, 'Gamtos mokslai'],
+        [/\bistorij/i, 'Istorija']
+    ];
+
+    const pathToCheck = (typeof file === 'object' && file.webkitRelativePath) ? file.webkitRelativePath : filename;
+    
+    for (const [pattern, sub] of SUBJECT_PATTERNS) {
+        if (pattern.test(pathToCheck)) {
+            subject = sub;
+            break;
+        }
     }
     
-    // Parse code (find pattern like 1.1, 1.2, 12.3, etc. or fallback to clean name)
     const codeMatch = nameWithoutExt.match(/(\d+[\.\-_]\d+)/);
     let code = '';
     if (codeMatch) {
-        // Normalize code format to X.Y (e.g. replace - or _ with .)
         code = codeMatch[1].replace(/[-_]/g, '.');
     } else {
-        // Fallback to name without spaces, limited length
         code = nameWithoutExt.trim().substring(0, 15);
     }
-    
     return { code, subject };
 }
 
@@ -403,7 +403,7 @@ async function handleLibraryFiles(files) {
             return;
         }
 
-        const parsed = parseFilename(file.name);
+        const parsed = parseFilename(file);
         elements.libCodeInput.value = parsed.code;
         state.libSelectedSubject = parsed.subject;
         
@@ -429,7 +429,7 @@ async function handleLibraryFiles(files) {
             console.error(err);
         }
     } else if (files.length > 1) {
-        let successCount = 0;
+        let pendingImports = [];
         let failedCount = 0;
         const details = [];
 
@@ -438,7 +438,7 @@ async function handleLibraryFiles(files) {
         overlay.innerHTML = `
             <div class="import-loading-card">
                 <div class="loading-spinner"></div>
-                <h3>Importuojami infografikai...</h3>
+                <h3>Ruošiami infografikai...</h3>
                 <p>Apdorojama: <span id="import-current-index">0</span> iš ${files.length}</p>
             </div>
         `;
@@ -454,33 +454,458 @@ async function handleLibraryFiles(files) {
                 continue;
             }
 
-            const parsed = parseFilename(file.name);
+            const parsed = parseFilename(file);
             try {
                 const infographic = await fileToInfographic(file, parsed.subject, parsed.code);
-                // Dedupe: silently overwrites same subject+code
-                await saveInfographicToDB(infographic);
-                successCount++;
-                details.push(`✔️ ${file.name} -> Kodas: ${parsed.code} (${parsed.subject})`);
+                infographic._filename = file.name; // Keep for display
+                pendingImports.push(infographic);
             } catch (err) {
                 failedCount++;
-                details.push(`❌ ${file.name}: Klaida saugant (${err.message})`);
+                details.push(`❌ ${file.name}: Klaida skaitant (${err.message})`);
             }
         }
-
         document.body.removeChild(overlay);
-        await renderLibraryTab();
+
+        if (pendingImports.length === 0) {
+            alert(`Nėra tinkamų failų importavimui.\nNepavyko: ${failedCount}\n\nDetali ataskaita:\n${details.join('\n')}`);
+            return;
+        }
+
+        // Render Review Modal
+        const modal = document.getElementById('import-review-modal');
+        const list = document.getElementById('import-review-list');
+        list.innerHTML = '';
+
+        pendingImports.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'import-review-row';
+            row.innerHTML = `
+                <img src="${item.thumbnail}" class="review-thumb">
+                <div class="review-filename" title="${item._filename}">${item._filename}</div>
+                <div class="review-inputs">
+                    <input type="text" value="${item.code}" id="import-code-${index}">
+                    <select id="import-subject-${index}">
+                        <option value="Matematika" ${item.subject === 'Matematika' ? 'selected' : ''}>Matematika</option>
+                        <option value="Gamtos mokslai" ${item.subject === 'Gamtos mokslai' ? 'selected' : ''}>Gamtos mokslai</option>
+                        <option value="Istorija" ${item.subject === 'Istorija' ? 'selected' : ''}>Istorija</option>
+                    </select>
+                </div>
+            `;
+            list.appendChild(row);
+        });
+
+        modal.classList.remove('hidden');
+
+        // Setup handlers for the modal
+        const closeBtn = document.getElementById('close-import-review-btn');
+        const cancelBtn = document.getElementById('cancel-import-btn');
+        const saveBtn = document.getElementById('save-import-btn');
+
+        const closeModal = () => {
+            modal.classList.add('hidden');
+            closeBtn.removeEventListener('click', closeModal);
+            cancelBtn.removeEventListener('click', closeModal);
+            saveBtn.removeEventListener('click', saveAll);
+        };
+
+        const saveAll = async () => {
+            closeModal();
+            let successCount = 0;
+            
+            // Show saving overlay
+            document.body.appendChild(overlay);
+            overlay.querySelector('h3').textContent = 'Išsaugoma į biblioteką...';
+            
+            for (let i = 0; i < pendingImports.length; i++) {
+                document.getElementById('import-current-index').textContent = i + 1;
+                const item = pendingImports[i];
+                const code = document.getElementById(`import-code-${i}`).value.trim();
+                const subject = document.getElementById(`import-subject-${i}`).value;
+                
+                // Update item with finalized data
+                item.code = code || item.code;
+                item.subject = subject;
+                item.id = `${item.subject}_${item.code}`; // regenerate ID
+                delete item._filename;
+                
+                try {
+                    await saveInfographicToDB(item);
+                    successCount++;
+                    details.push(`✔️ ${code} (${subject}) išsaugotas.`);
+                } catch (err) {
+                    failedCount++;
+                    details.push(`❌ Klaida saugant ${code}: ${err.message}`);
+                }
+            }
+            
+            document.body.removeChild(overlay);
+            await renderLibraryTab();
+            await renderTestSelectionTab();
+            alert(`Importavimas baigtas!\n\nSėkmingai išsaugota: ${successCount}\nNepavyko (įskaitant ankstesnes klaidas): ${failedCount}`);
+        };
+
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+        saveBtn.addEventListener('click', saveAll);
+    }* ==========================================================================
+   STATE MANAGEMENT
+   ========================================================================== */
+const state = {
+    apiKey: localStorage.getItem('infoquiz_api_key') || '',
+    
+    // Test Select Tab state
+    testSelectedSubject: 'Matematika',
+    
+    // Library Tab Form state
+    libUploadedImageBase64: '',
+    libUploadedImageSrc: '',
+    libImageThumbnail: '',
+    libSelectedSubject: 'Matematika',
+
+    // Active quiz state
+    activeInfographic: null, // Holds the selected infographic object
+    questions: [],
+    currentQuestionIndex: 0,
+    userAnswers: [],
+    
+    // History
+    history: JSON.parse(localStorage.getItem('infoquiz_history')) || []
+};
+
+// IndexedDB configuration
+const dbName = "InfoQuizDB";
+const storeName = "infographics";
+
+/* ==========================================================================
+   DOM ELEMENTS
+   ========================================================================== */
+const elements = {
+    // Warnings & Settings
+    apiWarningBanner: document.getElementById('api-warning-banner'),
+    fixApiBtn: document.getElementById('fix-api-btn'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsModal: document.getElementById('settings-modal'),
+    closeModalBtn: document.getElementById('close-modal-btn'),
+    cancelSettingsBtn: document.getElementById('cancel-settings-btn'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    apiKeyInput: document.getElementById('api-key-input'),
+    toggleApiKeyVisibility: document.getElementById('toggle-api-key-visibility'),
+
+    // Tabs
+    tabBtns: document.querySelectorAll('.tab-btn'),
+    tabPanes: document.querySelectorAll('.tab-pane'),
+
+    // Screens
+    configScreen: document.getElementById('config-screen'),
+    loadingScreen: document.getElementById('loading-screen'),
+    quizScreen: document.getElementById('quiz-screen'),
+    resultScreen: document.getElementById('result-screen'),
+
+    // TEST TAB ELEMENTS
+    testSubjectBtns: document.querySelectorAll('#test-subject-selector .subject-btn'),
+    testThemeGrid: document.getElementById('test-theme-grid'),
+    previewPlaceholderPrompt: document.getElementById('preview-placeholder-prompt'),
+    selectedPreviewContainer: document.getElementById('selected-preview-container'),
+    selectedPreviewSubject: document.getElementById('selected-preview-subject'),
+    selectedPreviewImage: document.getElementById('selected-preview-image'),
+    generateBtn: document.getElementById('generate-btn'),
+    
+    // LIBRARY TAB ELEMENTS
+    addInfographicForm: document.getElementById('add-infographic-form'),
+    libCodeInput: document.getElementById('lib-code-input'),
+    libSubjectBtns: document.querySelectorAll('#lib-subject-selector .subject-btn'),
+    libDropZone: document.getElementById('lib-drop-zone'),
+    libFileInput: document.getElementById('lib-file-input'),
+    libPreviewContainer: document.getElementById('lib-preview-container'),
+    libImagePreview: document.getElementById('lib-image-preview'),
+    libRemoveImageBtn: document.getElementById('lib-remove-image-btn'),
+    libSubmitBtn: document.getElementById('lib-submit-btn'),
+    libraryGrids: {
+        'Matematika': document.getElementById('library-grid-matematika'),
+        'Gamtos mokslai': document.getElementById('library-grid-gamtos'),
+        'Istorija': document.getElementById('library-grid-istorija')
+    },
+
+    // Loading View
+    loadingProgressBar: document.getElementById('loading-progress-bar'),
+    loadingStatusText: document.getElementById('loading-status-text'),
+
+    // Quiz View
+    quizSubjectBadge: document.getElementById('quiz-subject-badge'),
+    currentQuestionNum: document.getElementById('current-question-num'),
+    totalQuestionsNum: document.getElementById('total-questions-num'),
+    quizProgressFill: document.getElementById('quiz-progress-fill'),
+    questionText: document.getElementById('question-text'),
+    optionsContainer: document.getElementById('options-container'),
+    explanationPanel: document.getElementById('explanation-panel'),
+    explanationBody: document.getElementById('explanation-body'),
+    nextQuestionBtn: document.getElementById('next-question-btn'),
+
+    // Result View
+    resultBadgeIcon: document.getElementById('result-badge-icon'),
+    resultTitle: document.getElementById('result-title'),
+    resultSubtitle: document.getElementById('result-subtitle'),
+    scorePercent: document.getElementById('score-percent'),
+    scoreFraction: document.getElementById('score-fraction'),
+    resultRadialFill: document.getElementById('result-radial-fill'),
+    resultSubjectVal: document.getElementById('result-subject-val'),
+    resultGradeVal: document.getElementById('result-grade-val'),
+    toggleReviewBtn: document.getElementById('toggle-review-btn'),
+    reviewSection: document.getElementById('review-section'),
+    reviewList: document.getElementById('review-list'),
+    restartBtn: document.getElementById('restart-btn'),
+    goHomeBtn: document.getElementById('go-home-btn'),
+
+    // Zoom Modal
+    zoomModal: document.getElementById('zoom-modal'),
+    zoomedImage: document.getElementById('zoomed-image'),
+    closeZoomBtn: document.getElementById('close-zoom-btn'),
+
+    // History
+    historyGrid: document.getElementById('history-grid')
+};
+
+/* ==========================================================================
+   INDEXED DB FUNCTIONS
+   ========================================================================== */
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName, 2);
+        request.onupgradeneeded = function(e) {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(storeName)) {
+                db.createObjectStore(storeName, { keyPath: "id" });
+            }
+        };
+        request.onsuccess = function(e) {
+            resolve(e.target.result);
+        };
+        request.onerror = function(e) {
+            reject(e.target.error);
+        };
+    });
+}
+
+const withStore = async (mode, fn) => {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const store = db.transaction(storeName, mode).objectStore(storeName);
+        const req = fn(store);
+        if (req) {
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error);
+        } else {
+            store.transaction.oncomplete = () => resolve();
+            store.transaction.onerror = () => reject(store.transaction.error);
+        }
+    });
+};
+
+const saveInfographicToDB = o => withStore('readwrite', s => void s.put(o));
+const getAllInfographicsFromDB = () => withStore('readonly', s => s.getAll());
+const getInfographicFromDB = id => withStore('readonly', s => s.get(id));
+const deleteInfographicFromDB = id => withStore('readwrite', s => void s.delete(id));
+
+/* ==========================================================================
+   INITIALIZATION & SETTINGS
+   ========================================================================== */
+async function init() {
+    setupEventListeners();
+    checkApiKey();
+    await refreshTabsData();
+    renderHistory();
+}
+
+function checkApiKey() {
+    if (!state.apiKey) {
+        elements.apiWarningBanner.classList.remove('hidden');
+    } else {
+        elements.apiWarningBanner.classList.add('hidden');
+    }
+    updateGenerateButtonState();
+}
+
+function setupEventListeners() {
+    // Settings modal events
+    elements.settingsBtn.addEventListener(', openSettingsModal);
+    elements.fixApiBtn.addEventListener(', openSettingsModal);
+    elements.closeModalBtn.addEventListener(', closeSettingsModal);
+    elements.cancelSettingsBtn.addEventListener(', closeSettingsModal);
+    elements.saveSettingsBtn.addEventListener(', saveSettings);
+    
+    elements.toggleApiKeyVisibility.addEventListener('click', () => {
+        const type = elements.apiKeyInput.type === 'password' ? 'text' : 'password';
+        elements.apiKeyInput.type = type;
+        elements.toggleApiKeyVisibility.textContent = type === 'password' ? '👁️' : '🔒';
+    });
+
+    // Tab switcher events
+    elements.tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetTab = e.target.dataset.tab;
+            
+            elements.tabBtns.forEach(b => b.classList.remove('active'));
+            elements.tabPanes.forEach(p => p.classList.add('hidden'));
+            
+            e.target.classList.add('active');
+            document.getElementById(targetTab).classList.remove('hidden');
+            
+            refreshTabsData();
+        });
+    });
+
+    // Generate Quiz button click
+    elements.generateBtn.addEventListener(', generateQuiz);
+
+    // Subject selector in test form (Step 1)
+    elements.testSubjectBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            elements.testSubjectBtns.forEach(b => b.classList.remove('active'));
+            const targetBtn = e.currentTarget;
+            targetBtn.classList.add('active');
+            state.testSelectedSubject = targetBtn.dataset.subject;
+            
+            clearSelectedInfographicPreview();
+            renderTestSelectionTab();
+        });
+    });
+
+    // Quiz flow buttons
+    elements.nextQuestionBtn.addEventListener(', handleNextQuestion);
+    elements.selectedPreviewImage.addEventListener(', openZoomModal);
+    elements.closeZoomBtn.addEventListener(', closeZoomModal);
+    
+    // Result screen buttons
+    elements.restartBtn.addEventListener(', startQuiz);
+    elements.goHomeBtn.addEventListener(', goToHome);
+    
+    elements.toggleReviewBtn.addEventListener('click', () => {
+        elements.reviewSection.classList.toggle('hidden');
+        const isHidden = elements.reviewSection.classList.contains('hidden');
+        elements.toggleReviewBtn.textContent = isHidden 
+            ? 'Peržiūrėti klausimus ir atsakymus' 
+            : 'Slėpti atsakymų suvestinę';
+            
+        if (!isHidden) {
+            elements.reviewSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    });
+
+    // --- LIBRARY TAB EVENT LISTENERS ---
+    
+    // Subject selector in library form
+    elements.libSubjectBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            elements.libSubjectBtns.forEach(b => b.classList.remove('active'));
+            const targetBtn = e.currentTarget;
+            targetBtn.classList.add('active');
+            state.libSelectedSubject = targetBtn.dataset.subject;
+        });
+    });
+
+    // Library drag & drop / file selection
+    elements.libDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        elements.libDropZone.classList.add('drag-over');
+    });
+
+    elements.libDropZone.addEventListener('dragleave', () => {
+        elements.libDropZone.classList.remove('drag-over');
+    });
+
+    elements.libDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        elements.libDropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        handleLibraryFiles(files);
+    });
+
+    elements.libFileInput.addEventListener('change', (e) => {
+        const files = e.target.files;
+        handleLibraryFiles(files);
+    });
+
+    elements.libRemoveImageBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearLibraryUploadedImage();
+    });
+
+    elements.libCodeInput.addEventListener('input', () => {
+        updateLibrarySubmitButtonState();
+    });
+
+    // Save Infographic Form Submit
+    elements.addInfographicForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveInfographicToLibrary();
+    });
+}
+
+async function refreshTabsData() {
+    // Determine which tab is active and refresh its content
+    const activeTabBtn = document.querySelector('.tab-btn.active');
+    if (!activeTabBtn) return;
+    
+    const tabName = activeTabBtn.dataset.tab;
+    if (tabName === 'tab-tests') {
         await renderTestSelectionTab();
-        alert(`Importavimas baigtas!
-
-Sėkmingai importuota: ${successCount}
-Nepavyko: ${failedCount}
-
-Detali ataskaita:
-${details.join('
-')}`);
+    } else if (tabName === 'tab-library') {
+        await renderLibraryTab();
     }
 }
 
+/* ==========================================================================
+   SETTINGS MODAL MANAGEMENT
+   ========================================================================== */
+function openSettingsModal() {
+    elements.apiKeyInput.value = state.apiKey;
+    elements.settingsModal.classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+    elements.settingsModal.classList.add('hidden');
+}
+
+function saveSettings() {
+    const newKey = elements.apiKeyInput.value.trim();
+    state.apiKey = newKey;
+    localStorage.setItem('infoquiz_api_key', newKey);
+    checkApiKey();
+    closeSettingsModal();
+}
+
+/* ==========================================================================
+   LIBRARY TAB LOGIC
+   ========================================================================== */
+function parseFilename(file) {
+    const filename = file.name || file; // fallback if string is passed
+    const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+    
+    let subject = state.libSelectedSubject;
+    const SUBJECT_PATTERNS = [
+        [/\bmatematik/i, 'Matematika'],
+        [/\b(gamtos|gamta)\b/i, 'Gamtos mokslai'],
+        [/\bistorij/i, 'Istorija']
+    ];
+
+    const pathToCheck = (typeof file === 'object' && file.webkitRelativePath) ? file.webkitRelativePath : filename;
+    
+    for (const [pattern, sub] of SUBJECT_PATTERNS) {
+        if (pattern.test(pathToCheck)) {
+            subject = sub;
+            break;
+        }
+    }
+    
+    const codeMatch = nameWithoutExt.match(/(\d+[\.\-_]\d+)/);
+    let code = '';
+    if (codeMatch) {
+        code = codeMatch[1].replace(/[-_]/g, '.');
+    } else {
+        code = nameWithoutExt.trim().substring(0, 15);
+    }
+    return { code, subject };
+}
 
 function clearLibraryUploadedImage() {
     state.libUploadedImageBase64 = '';
@@ -806,10 +1231,11 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
     };
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`, {
+        const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'x-goog-api-key': state.apiKey
             },
             body: JSON.stringify(apiBody)
         });
@@ -856,7 +1282,7 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
     }
 }
 
-// Adjusted fake progress animation during loading screen for 20 questions (medium waiting, ~18s max)
+// Adjusted fake progress animation during loading screen for 20 questions (medium waiting, ~20s max)
 let progressInterval;
 function animateProgressBar() {
     let progress = 0;
@@ -880,7 +1306,7 @@ function animateProgressBar() {
         
         // Fill progress slowly up to 96% over 18s
         if (progress < 96) {
-            progress = Math.min(96, (elapsed / 18000) * 100);
+            progress = Math.min(96, (elapsed / 20000) * 100);
             elements.loadingProgressBar.style.width = `${progress}%`;
         }
 

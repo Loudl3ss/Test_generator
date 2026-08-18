@@ -5,10 +5,9 @@ Sveiki atvykę į **InfoQuiz**! Tai išmani programa, leidžianti automatiškai 
 ## 📥 Kaip atsisiųsti programą (Windows)?
 
 Jau paruoštą ir ištestuotą „Windows“ programos versiją galite atsisiųsti iš mūsų GitHub repozitorijos:
-1. Eikite į repozitorijos **Releases** skiltį (dešinėje pusėje esanti nuoroda „Releases“ arba „Latest“ ženkliukas).
-2. Atsidariusiame puslapyje, ties skyreliu „Assets“, suraskite ir atsisiųskite failą **`InfoQuiz-Windows.zip`**.
-3. Atsisiuntę `.zip` failą, išskleiskite jį savo kompiuteryje (dešiniuoju pelės mygtuku paspauskite ant failo ir pasirinkite *Extract all...* arba *Išskleisti viską...*).
-4. **SVARBU:** Atidarykite išskleistą aplanką, suraskite failą **`Paleisti.bat`** (gali būti pavadintas tiesiog `Paleisti`, jei jūsų kompiuteris slepia failų galūnes) ir dukart ant jo paspauskite. Šis failas automatiškai atidarys programą jūsų interneto naršyklėje!
+1. Atsisiųskite [InfoQuiz-Windows.zip](https://github.com/Loudl3ss/Test_generator/releases/latest/download/InfoQuiz-Windows.zip) (naujausia versija).
+2. Atsisiuntę `.zip` failą, išskleiskite jį savo kompiuteryje (dešiniuoju pelės mygtuku paspauskite ant failo ir pasirinkite *Extract all...* arba *Išskleisti viską...*).
+3. **SVARBU:** Atidarykite išskleistą aplanką, suraskite failą **`Paleisti.bat`** (gali būti pavadintas tiesiog `Paleisti`, jei jūsų kompiuteris slepia failų galūnes) ir dukart ant jo paspauskite. Šis failas automatiškai atidarys programą jūsų interneto naršyklėje!
 
 ---
 
@@ -30,7 +29,7 @@ Kad programa galėtų analizuoti infografikus ir kurti testus, jai reikalingas n
 2. Viršutiniame dešiniajame kampe paspauskite mygtuką **„Nustatymai“** (šalia krumpliaračio ikonos).
 3. Atsidariusiame lange rasite laukelį, pavadintą „API raktas“.
 4. **Įklijuokite** anksčiau nukopijuotą „Gemini API“ raktą į šį laukelį.
-5. Paspauskite išsaugoti. Jūsų raktas bus saugiai išsaugotas programoje ir kaskart įvedinėti nereikės.
+5. Paspauskite išsaugoti. Raktas išsaugomas jūsų kompiuterio naršyklėje (atviru tekstu). Nenaudokite rakto, susieto su apmokestinama paskyra, nes bet kas, turintis prieigą prie šio kompiuterio, gali jį pamatyti.
 
 ---
 
@@ -46,6 +45,8 @@ Kartu su programos leidimu esame paruošę infografikus 5 klasės mokiniams. Juo
    - `Matematika 5kl.zip`
 3. Kompiuteryje (dažniausiai „Atsisiuntimai“ aplanke) dešiniuoju pelės mygtuku paspauskite ant kiekvieno atsiųsto `.zip` failo ir pasirinkite **„Išskleisti viską“** (*Extract all*). Viduje rasite paveikslėlių failus (infografikus).
 
+> **Patarimas:** Bibliotekos skirtuke galite iš karto įtempti (drag & drop) visus išskleistus paveikslėlius vienu metu — programa pati atpažins temos kodą ir dalyką iš failo pavadinimo.
+
 ---
 
 ## 📝 4. Žingsnis: Kaip sugeneruoti testą?
@@ -58,3 +59,10 @@ Kai jau turite veikiančią programą su įvestu API raktu ir išskleistus infog
 4. **Atlikite testą:** Sugeneruotą testą galėsite peržiūrėti ir išspręsti pačioje programoje!
 
 *Sėkmingo mokymosi ir lengvo testų kūrimo!*
+
+
+## ⚠️ Svarbi informacija
+* **Reikalingas internetas:** Nors programa paleidžiama vietiniame kompiuteryje, kiekvienas testo generavimas naudoja interneto ryšį norint susisiekti su „Gemini API“.
+* **API limitai:** Nemokama „Gemini API“ versija turi užklausų limitus. Jei visa klasė (pvz. 25 mokiniai) vienu metu generuos testus, galite pasiekti limitą ir gauti klaidos pranešimą.
+* **Operacinė sistema:** Pateiktas `Paleisti.bat` failas skirtas „Windows“ operacinei sistemai. „macOS“ ir „Linux“ vartotojai gali paleisti programą naudodami Python tiesiogiai iš šaltinio kodo.
+* **Duomenų išsaugojimas:** Biblioteka saugoma jūsų naršyklės „IndexedDB“ atmintyje (`localhost`). Išvalius naršyklės duomenis, biblioteka dings.

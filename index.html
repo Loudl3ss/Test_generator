@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>InfoQuiz — Infografikų Testų Generatorius</title>
     <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Main Stylesheet -->
+<!-- Main Stylesheet -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -245,7 +242,7 @@
                         <div class="loading-pulse-core"></div>
                     </div>
                     <h2 class="loading-title">Analizuojama nuotrauka...</h2>
-                    <p class="loading-subtitle">Iš infografiko išgaunama informacija ir generuojami testiniai klausimai. Tai gali užtrukti 5–15 sekundžių.</p>
+                    <p class="loading-subtitle">Iš infografiko išgaunama informacija ir generuojami testiniai klausimai. Tai gali užtrukti apie 20 sekundžių.</p>
                     
                     <div class="loading-progress-container">
                         <div class="loading-progress-bar" id="loading-progress-bar"></div>
@@ -355,7 +352,7 @@
 
                     <div class="result-actions">
                         <button id="restart-btn" class="btn btn-secondary">
-                            Griežti iš naujo
+                            Spręsti iš naujo
                         </button>
                         <button id="go-home-btn" class="btn btn-primary">
                             Sukurti naują testą
@@ -412,6 +409,32 @@
             </button>
             <div class="zoom-image-container">
                 <img src="" alt="Padidintas infografikas" id="zoomed-image" class="zoomed-image">
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- IMPORT REVIEW MODAL -->
+    <div class="modal-backdrop hidden" id="import-review-modal">
+        <div class="modal-content review-modal-content" style="max-width: 800px; width: 90%; max-height: 90vh; display: flex; flex-direction: column;">
+            <div class="modal-header">
+                <h2>Importavimo peržiūra</h2>
+                <button class="btn btn-icon" id="close-import-review-btn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" style="flex: 1; overflow-y: auto;">
+                <p class="review-subtitle" style="margin-bottom: 1rem; color: rgba(255,255,255,0.6);">Patikrinkite ir pataisykite automatiškai atpažintus duomenis prieš išsaugant.</p>
+                <div class="import-review-list" id="import-review-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Rows injected via JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-import-btn">Atšaukti</button>
+                <button class="btn btn-primary" id="save-import-btn">Išsaugoti visus į biblioteką</button>
             </div>
         </div>
     </div>
