@@ -559,41 +559,120 @@ function parseFilename(file) {
     return { code, subject };
 }
 
+async function readFileAsDataURL(file) {
+    let lastError = null;
+
+    // Strategy 1: file.arrayBuffer() (robust on modern browsers, avoids sync buffer blocks)
+    if (typeof file.arrayBuffer === 'function') {
+        try {
+            const buffer = await file.arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            const chunkSize = 16384;
+            for (let i = 0; i < bytes.byteLength; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            const b64 = btoa(binary);
+            const mime = file.type || 'image/png';
+            return `data:${mime};base64,${b64}`;
+        } catch (e) {
+            console.warn('file.arrayBuffer failed:', e);
+            lastError = e;
+        }
+    }
+
+    // Strategy 2: FileReader
+    try {
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error || new Error('Klaida skaitant failą'));
+            reader.readAsDataURL(file);
+        });
+    } catch (e) {
+        console.warn('FileReader failed:', e);
+        lastError = e;
+    }
+
+    // Strategy 3: URL.createObjectURL + Canvas
+    if (typeof URL !== 'undefined' && URL.createObjectURL) {
+        try {
+            return await new Promise((resolve, reject) => {
+                const url = URL.createObjectURL(file);
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth || img.width;
+                        canvas.height = img.naturalHeight || img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        const dataUrl = canvas.toDataURL(file.type || 'image/png');
+                        URL.revokeObjectURL(url);
+                        resolve(dataUrl);
+                    } catch (canvasErr) {
+                        URL.revokeObjectURL(url);
+                        reject(canvasErr);
+                    }
+                };
+                img.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    reject(new Error('Nepavyko sukurti Blob peržiūros'));
+                };
+                img.src = url;
+            });
+        } catch (e) {
+            console.warn('createObjectURL fallback failed:', e);
+            lastError = e;
+        }
+    }
+
+    const errorMsg = lastError?.message || lastError?.name || 'Nepavyko pasiekti failo';
+    throw new Error(errorMsg);
+}
+
 async function fileToInfographic(file, subject, code) {
+    let fullDataUrl;
+    try {
+        fullDataUrl = await readFileAsDataURL(file);
+    } catch (err) {
+        console.error('Klaida nuskaitant infografiko failą:', err);
+        const isSandbox = (err.name === 'NotReadableError') || 
+                          (err.message && (err.message.includes('permission') || err.message.includes('access') || err.message.includes('NotReadable')));
+        if (isSandbox) {
+            throw new Error('Naršyklė neturi leidimo pasiekti šio aplanko (Linux Flatpak apribojimas). Perkraukite Brave naršyklę arba naudokite failų pasirinkimo mygtuką.');
+        }
+        throw new Error(`Klaida skaitant failą: ${err.message}`);
+    }
+
     return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = 120;
-                canvas.height = 120;
-                
-                const size = Math.min(img.width, img.height);
-                const sx = (img.width - size) / 2;
-                const sy = (img.height - size) / 2;
-                ctx.drawImage(img, sx, sy, size, size, 0, 0, 120, 120);
-                
-                const thumbnail = canvas.toDataURL('image/jpeg', 0.85);
-                const fullDataUrl = e.target.result;
-                const imageBase64 = fullDataUrl.split(',')[1] || '';
-                
-                resolve({
-                    id: `${subject}_${code}`,
-                    code: code,
-                    subject: subject,
-                    imageSrc: fullDataUrl,
-                    imageBase64: imageBase64,
-                    thumbnail: thumbnail,
-                    addedAt: new Date().toISOString()
-                });
-            };
-            img.onerror = () => reject(new Error('Nepavyko perskaityti paveikslėlio'));
-            img.src = e.target.result;
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 120;
+            canvas.height = 120;
+            
+            const size = Math.min(img.width, img.height);
+            const sx = (img.width - size) / 2;
+            const sy = (img.height - size) / 2;
+            ctx.drawImage(img, sx, sy, size, size, 0, 0, 120, 120);
+            
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.85);
+            const imageBase64 = fullDataUrl.split(',')[1] || '';
+            
+            resolve({
+                id: `${subject}_${code}`,
+                code: code,
+                subject: subject,
+                imageSrc: fullDataUrl,
+                imageBase64: imageBase64,
+                thumbnail: thumbnail,
+                addedAt: new Date().toISOString()
+            });
         };
-        reader.onerror = () => reject(new Error('Klaida skaitant failą'));
-        reader.readAsDataURL(file);
+        img.onerror = () => reject(new Error('Nepavyko apdoroti paveikslėlio formato'));
+        img.src = fullDataUrl;
     });
 }
 
