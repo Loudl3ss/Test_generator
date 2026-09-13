@@ -728,6 +728,14 @@ h2 {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.quiz-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .badge {
@@ -2033,6 +2041,92 @@ h2 {
     border-color: #ef4444;
     background: rgba(239, 68, 68, 0.25);
     box-shadow: 0 0 16px rgba(239, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   QUIZ INFOGRAPHIC REFERENCE DISPLAY
+   ========================================================================== */
+.quiz-infographic-reference {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: rgba(15, 18, 35, 0.75);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.reference-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.reference-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-light);
+}
+
+.btn-zoom-hint {
+    background: rgba(99, 102, 241, 0.15);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: var(--primary-light);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all var(--transition-fast);
+}
+
+.btn-zoom-hint:hover {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.reference-image-wrapper {
+    position: relative;
+    max-height: 380px;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #080a14;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    cursor: zoom-in;
+}
+
+.quiz-reference-image {
+    max-height: 380px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    transition: transform 0.25s ease;
+}
+
+.reference-image-wrapper:hover .quiz-reference-image {
+    transform: scale(1.02);
+}
+
+.badge-infographic {
+    background: rgba(99, 102, 241, 0.25) !important;
+    border-color: rgba(99, 102, 241, 0.5) !important;
+    color: #c7d2fe !important;
 }
 
 /* ==========================================================================

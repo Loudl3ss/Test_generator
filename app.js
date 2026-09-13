@@ -100,6 +100,11 @@ const elements = {
     currentQuestionNum: document.getElementById('current-question-num'),
     totalQuestionsNum: document.getElementById('total-questions-num'),
     quizProgressFill: document.getElementById('quiz-progress-fill'),
+    quizToggleInfographicBtn: document.getElementById('quiz-toggle-infographic-btn'),
+    quizInfographicReference: document.getElementById('quiz-infographic-reference'),
+    quizReferenceImage: document.getElementById('quiz-reference-image'),
+    quizZoomRefBtn: document.getElementById('quiz-zoom-ref-btn'),
+    quizReferenceWrapper: document.getElementById('quiz-reference-wrapper'),
     questionTypeBadge: document.getElementById('question-type-badge'),
     questionText: document.getElementById('question-text'),
     snippetContainer: document.getElementById('snippet-container'),
@@ -368,6 +373,15 @@ function setupEventListeners() {
     elements.nextQuestionBtn.addEventListener('click', handleNextQuestion);
     elements.selectedPreviewImage.addEventListener('click', openZoomModal);
     elements.closeZoomBtn.addEventListener('click', closeZoomModal);
+    if (elements.quizToggleInfographicBtn) {
+        elements.quizToggleInfographicBtn.addEventListener('click', openZoomModal);
+    }
+    if (elements.quizZoomRefBtn) {
+        elements.quizZoomRefBtn.addEventListener('click', openZoomModal);
+    }
+    if (elements.quizReferenceWrapper) {
+        elements.quizReferenceWrapper.addEventListener('click', openZoomModal);
+    }
     
     // Result screen buttons
     elements.restartBtn.addEventListener('click', startQuiz);
@@ -1144,10 +1158,21 @@ ${pedagogicalGuidance}
 
 KLAUSIMŲ TIPŲ MIŠINYS (privaloma sugeneruoti įvairių tipų užduočių rinkinį, pvz.: ~12 multiple_choice, ~3 hotspot, ~3 ordering, ~2 image_snippet):
 
-1. "multiple_choice": Standartinis klausimas su lygiai 4 pasirinkimo variantais ('options') ir teisingo atsakymo indeksu ('correctAnswerIndex' nuo 0 iki 3). Klausimas tikrina temos supratimą ir faktų žinojimą.
-2. "hotspot": GRAFINIS KLAUSIMAS! Mokinys turi spustelėti ant konkrečios infografiko vietos (pvz.: "Raskite infografike...", "Pažymėkite, kur pavaizduota..."). Privaloma nurodyti 'hotspotArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000, "label": "paaiškinimas" } (koordinatės normalizuotos 0-1000 intervale pagal paveikslėlio aukštį ir plotį).
+1. "multiple_choice": Standartinis klausimas su lygiai 4 pasirinkimo variantais ('options') ir teisingo atsakymo indeksu ('correctAnswerIndex' nuo 0 iki 3).
+2. "hotspot": GRAFINIS KLAUSIMAS! Mokinys turi spustelėti ant konkrečios infografiko vietos (pvz.: "Raskite infografike...", "Pažymėkite, kur pavaizduota..."). Privaloma nurodyti 'hotspotArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000, "label": "paaiškinimas" } (koordinatės normalizuotos 0-1000 intervale pagal paveikslėlio aukštį ir plotį). Visada basedOnInfographic = true.
 3. "ordering": RIKIAVIMO KLAUSIMAS! Mokinys turi sudėlioti 4 elementus teisinga seka (chronologinė tvarka, proceso etapai, reikšmių didėjimas). Pateik 'items' (4 tekstiniai elementai) ir 'correctOrder' (teisingi indeksai, pvz., [0, 1, 2, 3] arba [3, 1, 0, 2]).
-4. "image_snippet": GRAFINIS KLAUSIMAS! Nurodyk 'snippetArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000 } (0-1000 intervale), kuri žymi konkrečią infografiko dalį (schemą, formulę, grafiką). Programa šią dalį automatiškai iškirps ir parodys mokiniui. Užduok klausimą apie šį iškirptą fragmentą su 4 pasirinkimo variantais ('options' ir 'correctAnswerIndex').
+4. "image_snippet": GRAFINIS KLAUSIMAS! Nurodyk 'snippetArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000 } (0-1000 intervale), kuri žymi konkrečią infografiko dalį (schemą, formulę, grafiką). Programa šią dalį automatiškai iškirps ir parodys mokiniui. Užduok klausimą apie šį iškirptą fragmentą su 4 pasirinkimo variantais ('options' ir 'correctAnswerIndex'). Visada basedOnInfographic = true.
+
+KRITIŠKAI SVARBIOS TAISYKLĖS DĖL INFOGRAFIKO RODIMO IR KLAUSIMŲ FORMULAVIMO:
+- Kiekvienas klausimas privalo turėti loginį parametrą 'basedOnInfographic': true ARBA false.
+- Jei 'basedOnInfographic': true:
+  * Tai reiškia, kad klausimas tiesiogiai remiasi infografiku (jo diagramomis, iliustracijomis, schemomis, lentelėmis, skaičiais ar užrašais nuotraukoje).
+  * Sprendimo metu sistema ŠĮ INFOGRAFIKĄ (arba iškirptą fragmentą) BŪTINAI PARODYS MOKINIUI tiesiai virš klausimo!
+  * Užduočių tipai 'hotspot' ir 'image_snippet' VISADA privalo turėti "basedOnInfographic": true.
+- Jei 'basedOnInfographic': false:
+  * Tai bendras teorinis, dalykinis ar loginis klausimas pagal ${gradeNumber} klasės programą.
+  * Sprendimo metu mokinys infografiko NEMATYS!
+  * TODĖL GRIEŽTAI DRAUDŽIAMA klausime ar atsakymuose minėti infografiką! Negali būti frazių: „pagal infografiką“, „kaip matote paveikslėlyje“, „infografike nurodyta“, „schemoje pavaizduota“, „kairėje/dešinėje pavaizduota“ ar klausti apie detales, kurių be nuotraukos mokinys negali žinoti. Klausimas privalo būti visiškai savarankiškas ir suprantamas be jokio paveikslėlio!
 
 Kiekviena užduotis privalo turėti aiškų ir motyvuojantį lietuvišką paaiškinimą ('explanation').
 Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
@@ -1177,6 +1202,10 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
                         type: {
                             type: "STRING",
                             description: "Užduoties tipas: 'multiple_choice', 'hotspot', 'ordering' arba 'image_snippet'"
+                        },
+                        basedOnInfographic: {
+                            type: "BOOLEAN",
+                            description: "Privalomas: true – jei klausimas remiasi infografiku (sistema parodys infografiką klausimo metu); false – jei bendras teorinis klausimas (infografikas nebus rodomas, klausimas negali minėti infografiko)"
                         },
                         question: {
                             type: "STRING",
@@ -1227,7 +1256,7 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
                             description: "Išsamus paaiškinimas lietuvių kalba"
                         }
                     },
-                    required: ["type", "question", "explanation"]
+                    required: ["type", "question", "explanation", "basedOnInfographic"]
                 }
             }
         }
@@ -1268,15 +1297,21 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
 
             let opts = Array.isArray(q.options) ? [...q.options] : [];
             while (opts.length < 4) opts.push("Nepateikta");
-            if (opts.length > 4) opts.length = 4;
-
-            let items = Array.isArray(q.items) && q.items.length >= 2 ? [...q.items] : ["1 etapas", "2 etapas", "3 etapas", "4 etapas"];
-            let correctOrder = Array.isArray(q.correctOrder) && q.correctOrder.length === items.length
-                ? q.correctOrder
-                : items.map((_, i) => i);
+            // Normalize basedOnInfographic
+            let basedOnInfographic = false;
+            if (type === 'hotspot' || type === 'image_snippet') {
+                basedOnInfographic = true;
+            } else if (typeof q.basedOnInfographic === 'boolean') {
+                basedOnInfographic = q.basedOnInfographic;
+            } else if (typeof q.basedOnInfographic === 'string') {
+                basedOnInfographic = (q.basedOnInfographic.toLowerCase() === 'true');
+            } else {
+                basedOnInfographic = /infografik|paveiksl|schem|diagram|lentel|pavaizduot/i.test(q.question || '');
+            }
 
             return {
                 type: type,
+                basedOnInfographic: basedOnInfographic,
                 question: q.question || "Užduotis",
                 options: opts,
                 correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
@@ -1356,6 +1391,7 @@ function renderQuestion(index) {
     elements.questionText.textContent = q.question;
     elements.optionsContainer.innerHTML = '';
     elements.optionsContainer.classList.add('hidden');
+    if (elements.quizInfographicReference) elements.quizInfographicReference.classList.add('hidden');
     if (elements.snippetContainer) elements.snippetContainer.classList.add('hidden');
     if (elements.hotspotContainer) elements.hotspotContainer.classList.add('hidden');
     if (elements.orderingContainer) elements.orderingContainer.classList.add('hidden');
@@ -1368,23 +1404,42 @@ function renderQuestion(index) {
         hotspotClickHandler = null;
     }
 
+    const isInfographicBased = (q.basedOnInfographic === true || q.type === 'hotspot' || q.type === 'image_snippet');
+
+    // Show Infographic reference for multiple choice & ordering if based on infographic
+    if (elements.quizInfographicReference) {
+        if (isInfographicBased && q.type !== 'hotspot' && q.type !== 'image_snippet') {
+            elements.quizInfographicReference.classList.remove('hidden');
+            if (elements.quizReferenceImage && state.activeInfographic) {
+                elements.quizReferenceImage.src = state.activeInfographic.imageSrc;
+            }
+        } else {
+            elements.quizInfographicReference.classList.add('hidden');
+        }
+    }
+
     // Configure question type badge and dispatch renderer
     if (elements.questionTypeBadge) {
         elements.questionTypeBadge.className = 'question-type-badge';
         if (q.type === 'hotspot') {
             elements.questionTypeBadge.classList.add('badge-hotspot');
-            elements.questionTypeBadge.textContent = '🎯 Interaktyvus žymėjimas';
+            elements.questionTypeBadge.textContent = '🎯 Interaktyvus žymėjimas (infografikas)';
             renderHotspotQuestion(q);
         } else if (q.type === 'ordering') {
             elements.questionTypeBadge.classList.add('badge-ordering');
-            elements.questionTypeBadge.textContent = '🔢 Sekos rikiavimas';
+            elements.questionTypeBadge.textContent = isInfographicBased ? '🔢 Rikiavimas (iš infografiko)' : '🔢 Sekos rikiavimas';
             renderOrderingQuestion(q);
         } else if (q.type === 'image_snippet') {
             elements.questionTypeBadge.classList.add('badge-snippet');
             elements.questionTypeBadge.textContent = '🔍 Fragmento analizė';
             renderSnippetQuestion(q);
         } else {
-            elements.questionTypeBadge.textContent = 'Pasirinkimo klausimas';
+            if (isInfographicBased) {
+                elements.questionTypeBadge.classList.add('badge-infographic');
+                elements.questionTypeBadge.textContent = '📊 Infografiko analizė';
+            } else {
+                elements.questionTypeBadge.textContent = '📖 Žinių / teorijos klausimas';
+            }
             renderMultipleChoiceQuestion(q);
         }
     } else {
@@ -1781,11 +1836,17 @@ function renderReviewList() {
             });
         }
 
+        const isInfographicBased = (q.basedOnInfographic === true || q.type === 'hotspot' || q.type === 'image_snippet');
+        const infoBadge = isInfographicBased 
+            ? '<span class="review-q-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(99, 102, 241, 0.2); color: #c7d2fe; margin-left: 0.4rem;">📊 Pagrįstas infografiku</span>'
+            : '<span class="review-q-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-left: 0.4rem;">📖 Teorinis</span>';
+
         reviewItem.innerHTML = `
             <div class="review-q-header">
                 <span class="review-q-num">#${i + 1}</span>
-                <span class="review-q-badge" style="font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-right: auto; margin-left: 0.5rem;">${typeLabel}</span>
-                <span class="review-status-badge ${isCorrect ? 'correct' : 'wrong'}">
+                <span class="review-q-badge" style="font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-left: 0.5rem;">${typeLabel}</span>
+                ${infoBadge}
+                <span class="review-status-badge ${isCorrect ? 'correct' : 'wrong'}" style="margin-left: auto;">
                     ${isCorrect ? 'Teisingai (+1)' : 'Neteisingai (0)'}
                 </span>
             </div>
