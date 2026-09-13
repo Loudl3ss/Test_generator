@@ -1,10 +1,10 @@
 @echo off
-title InfoQuiz v2.0 Serveris
+title InfoQuiz v2.0.1 Serveris
 chcp 65001 > nul
 setlocal enabledelayedexpansion
 
 echo ===================================================
-echo   Paleidžiama InfoQuiz v2.0 aplikacija...
+echo   Paleidžiama InfoQuiz v2.0.1 aplikacija...
 echo   Naršyklė su testais atsidarys automatiškai.
 echo ===================================================
 echo.

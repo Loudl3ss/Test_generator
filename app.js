@@ -1,4 +1,4 @@
-const APP_VERSION = '2.0.0';
+const APP_VERSION = '2.0.1';
 
 /* ==========================================================================
    STATE MANAGEMENT
@@ -6,6 +6,10 @@ const APP_VERSION = '2.0.0';
 const state = {
     version: APP_VERSION,
     apiKey: localStorage.getItem('infoquiz_api_key') || '',
+    
+    // Grade Selection (1–12)
+    selectedGrade: localStorage.getItem('infoquiz_selected_grade') || '5',
+    selectedTier: localStorage.getItem('infoquiz_selected_tier') || 'middle1',
     
     // Test Select Tab state
     testSelectedSubject: 'Matematika',
@@ -55,6 +59,11 @@ const elements = {
     quizScreen: document.getElementById('quiz-screen'),
     resultScreen: document.getElementById('result-screen'),
 
+    // GRADE SELECTOR ELEMENTS
+    gradeTierBtns: document.querySelectorAll('#grade-tier-selector .tier-btn'),
+    gradePillGrid: document.getElementById('grade-pill-grid'),
+    selectedGradeBadge: document.getElementById('selected-grade-badge'),
+
     // TEST TAB ELEMENTS
     testSubjectBtns: document.querySelectorAll('#test-subject-selector .subject-btn'),
     testThemeGrid: document.getElementById('test-theme-grid'),
@@ -84,12 +93,23 @@ const elements = {
     loadingProgressBar: document.getElementById('loading-progress-bar'),
     loadingStatusText: document.getElementById('loading-status-text'),
 
-    // Quiz View
+    // Quiz View & Multimodal Components
     quizSubjectBadge: document.getElementById('quiz-subject-badge'),
     currentQuestionNum: document.getElementById('current-question-num'),
     totalQuestionsNum: document.getElementById('total-questions-num'),
     quizProgressFill: document.getElementById('quiz-progress-fill'),
+    questionTypeBadge: document.getElementById('question-type-badge'),
     questionText: document.getElementById('question-text'),
+    snippetContainer: document.getElementById('snippet-container'),
+    snippetImage: document.getElementById('snippet-image'),
+    hotspotContainer: document.getElementById('hotspot-container'),
+    hotspotWrapper: document.getElementById('hotspot-wrapper'),
+    hotspotImage: document.getElementById('hotspot-image'),
+    hotspotPin: document.getElementById('hotspot-pin'),
+    hotspotTargetBox: document.getElementById('hotspot-target-box'),
+    orderingContainer: document.getElementById('ordering-container'),
+    orderingList: document.getElementById('ordering-list'),
+    confirmOrderBtn: document.getElementById('confirm-order-btn'),
     optionsContainer: document.getElementById('options-container'),
     explanationPanel: document.getElementById('explanation-panel'),
     explanationBody: document.getElementById('explanation-body'),
@@ -164,6 +184,7 @@ const deleteInfographicFromDB = id => withStore('readwrite', s => void s.delete(
    INITIALIZATION & SETTINGS
    ========================================================================== */
 async function init() {
+    initGradeSelector();
     setupEventListeners();
     checkApiKey();
     await refreshTabsData();
@@ -178,6 +199,89 @@ function checkApiKey() {
     }
     updateGenerateButtonState();
 }
+
+/* ==========================================================================
+   GRADE SELECTOR (1–12 KL.)
+   ========================================================================== */
+const GRADE_TIERS = {
+    primary: { label: 'Pradinis ugdymas', grades: [1, 2, 3, 4] },
+    middle1: { label: 'Pagrindinis I', grades: [5, 6, 7, 8] },
+    middle2: { label: 'Pagrindinis II (PUPP)', grades: [9, 10] },
+    gymnasium: { label: 'Gimnazija (VBE)', grades: [11, 12] }
+};
+
+function initGradeSelector() {
+    // Determine initial tier from saved grade
+    const curGrade = parseInt(state.selectedGrade, 10) || 5;
+    for (const [tierKey, tierObj] of Object.entries(GRADE_TIERS)) {
+        if (tierObj.grades.includes(curGrade)) {
+            state.selectedTier = tierKey;
+            break;
+        }
+    }
+
+    renderGradePills();
+    updateGradeBadge();
+
+    if (elements.gradeTierBtns) {
+        elements.gradeTierBtns.forEach(btn => {
+            if (btn.dataset.tier === state.selectedTier) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+
+            btn.addEventListener('click', (e) => {
+                elements.gradeTierBtns.forEach(b => b.classList.remove('active'));
+                const targetBtn = e.currentTarget;
+                targetBtn.classList.add('active');
+                const tier = targetBtn.dataset.tier;
+                state.selectedTier = tier;
+                localStorage.setItem('infoquiz_selected_tier', tier);
+
+                // If current grade not in this tier, select first grade of the tier
+                if (!GRADE_TIERS[tier].grades.includes(parseInt(state.selectedGrade, 10))) {
+                    state.selectedGrade = String(GRADE_TIERS[tier].grades[0]);
+                    localStorage.setItem('infoquiz_selected_grade', state.selectedGrade);
+                }
+
+                renderGradePills();
+                updateGradeBadge();
+            });
+        });
+    }
+}
+
+function renderGradePills() {
+    if (!elements.gradePillGrid) return;
+    elements.gradePillGrid.innerHTML = '';
+    const activeTier = GRADE_TIERS[state.selectedTier] || GRADE_TIERS.middle1;
+    
+    activeTier.grades.forEach(gradeNum => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'grade-pill';
+        if (String(gradeNum) === String(state.selectedGrade)) {
+            btn.classList.add('active');
+        }
+        btn.textContent = `${gradeNum} kl.`;
+        btn.addEventListener('click', () => {
+            state.selectedGrade = String(gradeNum);
+            localStorage.setItem('infoquiz_selected_grade', state.selectedGrade);
+            renderGradePills();
+            updateGradeBadge();
+        });
+        elements.gradePillGrid.appendChild(btn);
+    });
+}
+
+function updateGradeBadge() {
+    if (!elements.selectedGradeBadge) return;
+    const tier = state.selectedTier;
+    const tierLabel = GRADE_TIERS[tier]?.label || '';
+    elements.selectedGradeBadge.textContent = `${state.selectedGrade} klasė (${tierLabel})`;
+}
+
 
 function setupEventListeners() {
     // Settings modal events
@@ -810,7 +914,7 @@ function updateGenerateButtonState() {
 }
 
 /* ==========================================================================
-   GEMINI API INTEGRATION & LOADING (20 QUESTIONS)
+   GEMINI API INTEGRATION & LOADING (UNIVERSAL 1–12 KL. & MULTIMODAL)
    ========================================================================== */
 async function generateQuiz() {
     if (!state.apiKey || !state.activeInfographic) return;
@@ -820,17 +924,38 @@ async function generateQuiz() {
     animateProgressBar();
 
     const infoObj = state.activeInfographic;
+    const gradeNumber = parseInt(state.selectedGrade, 10) || 5;
 
-    // Fixed 20 questions prompt with Lietuviskas instructives
-    const promptText = `Tu esi profesionalus mokytojas ir testų kūrėjas. Tavo užduotis yra atidžiai išanalizuoti pateiktą infografiką (nuotrauką) ir pagal jį sugeneruoti lygiai 20 testinių klausimų lietuvių kalba pasirinkta tema: ${infoObj.subject}.
+    let pedagogicalGuidance = '';
+    if (gradeNumber <= 4) {
+        pedagogicalGuidance = `TIKSLINĖ AUDITORIJA: 1-4 klasės mokiniai (pradinis ugdymas).
+- Vartok labai aiškią, paprastą, trumpą kalbą ir kasdienius žodžius.
+- Užduotys turi būti orientuotos į vizualų stebėjimą, tiesioginį elementų atpažinimą, paprastą skaičiavimą (kiek objektų?), spalvas, formas ar gyvūnų/augalų bruožus.
+- Venk sunkių teorinių ar akademinių formuluočių.`;
+    } else if (gradeNumber <= 8) {
+        pedagogicalGuidance = `TIKSLINĖ AUDITORIJA: 5-8 klasės mokiniai (pagrindinis ugdymas I dalis).
+- Klausimai turi atitikti Lietuvos 5-8 klasių bendrojo ugdymo programą.
+- Tikrink temų supratimą, dėsningumus, priežasties-pasekmės ryšius, chronologiją, schemų dalių atpažinimą ir procesų eigą.`;
+    } else if (gradeNumber <= 10) {
+        pedagogicalGuidance = `TIKSLINĖ AUDITORIJA: 9-10 klasės mokiniai (PUPP lygis).
+- Užduotys turi reikalauti analitinio mąstymo, fizikinių/cheminių dėsnių, formulių supratimo, diagramų, lentelių ir žemėlapių interpretavimo bei istorinių kontekstų analizės.`;
+    } else {
+        pedagogicalGuidance = `TIKSLINĖ AUDITORIJA: 11-12 klasės gimnazistai (VBE lygis - pasirengimas Valstybiniams brandos egzaminams).
+- Užduotys turi būti aukšto akademinio lygio, reikalaujančios gilaus mąstymo, hipotezių kėlimo, kritinio duomenų vertinimo ir daugiasluoksnės analizės.`;
+    }
 
-Kiekvienas klausimas privalo:
-1. Remtis informacija, skaičiais, faktais ar koncepcijomis, pavaizduotomis infografike. Kadangi vartotojas testo metu infografiko nematys (jis bus paslėptas, kad nebūtų galima tiesiogiai nurašyti atsakymų), klausimai turi tikrinti žinias, faktų prisiminimą ir temos supratimą, o ne tiesioginę vaizdinę analizę (pvz., neklauskite „Ką vaizduoja žalia rodyklė?“ ar „Kokia spalva pavaizduotas...?“). Klausimus bei paaiškinimus gali papildyti bendromis mokslo/istorijos žiniomis (pvz., iš Wikipedia ar vadovėlių apie tą pačią temą), kad įvertintum bendrą temos supratimą.
-2. Turėti lygiai 4 atsakymo variantus (pasirinkimus).
-3. Turėti tik 1 teisingą atsakymą.
-4. Turėti aiškų ir trumpą lietuvišką paaiškinimą (explanation), kodėl būtent šis atsakymas yra teisingas, remiantis infografiko informacija bei bendromis temos žiniomis.
-5. Klausimai NETURI tiesiogiai referuoti į patį infografiką (venkite frazių „kaip parodyta infografike...“, „pagal infografiką...“). Klausimas turi skambėti kaip tikras kontrolinio darbo klausimas apie pateiktus faktus (pvz., vietoj „Koks skaičius apie vandenį nurodytas infografike?“ klauskite „Kiek procentų Žemės vandens yra gėlas?“).
+    const promptText = `Tu esi profesionalus Lietuvos pedagogas ir egzaminų testų kūrėjas. Tavo užduotis yra atidžiai išanalizuoti pateiktą infografiką (nuotrauką) ir pagal jį sugeneruoti lygiai 20 įvairiapusių testo užduočių lietuvių kalba pasirinkta tema: ${infoObj.subject}, skirtų ${gradeNumber} klasei.
 
+${pedagogicalGuidance}
+
+KLAUSIMŲ TIPŲ MIŠINYS (privaloma sugeneruoti įvairių tipų užduočių rinkinį, pvz.: ~12 multiple_choice, ~3 hotspot, ~3 ordering, ~2 image_snippet):
+
+1. "multiple_choice": Standartinis klausimas su lygiai 4 pasirinkimo variantais ('options') ir teisingo atsakymo indeksu ('correctAnswerIndex' nuo 0 iki 3). Klausimas tikrina temos supratimą ir faktų žinojimą.
+2. "hotspot": GRAFINIS KLAUSIMAS! Mokinys turi spustelėti ant konkrečios infografiko vietos (pvz.: "Raskite infografike...", "Pažymėkite, kur pavaizduota..."). Privaloma nurodyti 'hotspotArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000, "label": "paaiškinimas" } (koordinatės normalizuotos 0-1000 intervale pagal paveikslėlio aukštį ir plotį).
+3. "ordering": RIKIAVIMO KLAUSIMAS! Mokinys turi sudėlioti 4 elementus teisinga seka (chronologinė tvarka, proceso etapai, reikšmių didėjimas). Pateik 'items' (4 tekstiniai elementai) ir 'correctOrder' (teisingi indeksai, pvz., [0, 1, 2, 3] arba [3, 1, 0, 2]).
+4. "image_snippet": GRAFINIS KLAUSIMAS! Nurodyk 'snippetArea': { "ymin": 0-1000, "xmin": 0-1000, "ymax": 0-1000, "xmax": 0-1000 } (0-1000 intervale), kuri žymi konkrečią infografiko dalį (schemą, formulę, grafiką). Programa šią dalį automatiškai iškirps ir parodys mokiniui. Užduok klausimą apie šį iškirptą fragmentą su 4 pasirinkimo variantais ('options' ir 'correctAnswerIndex').
+
+Kiekviena užduotis privalo turėti aiškų ir motyvuojantį lietuvišką paaiškinimą ('explanation').
 Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
 
     const apiBody = {
@@ -851,29 +976,64 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
             responseMimeType: "application/json",
             responseSchema: {
                 type: "ARRAY",
-                description: "Masyvas su sugeneruotais 20 testo klausimų",
+                description: "Masyvas su sugeneruotomis 20 testo užduočių",
                 items: {
                     type: "OBJECT",
                     properties: {
+                        type: {
+                            type: "STRING",
+                            description: "Užduoties tipas: 'multiple_choice', 'hotspot', 'ordering' arba 'image_snippet'"
+                        },
                         question: {
                             type: "STRING",
-                            description: "Klausimo tekstas lietuvių kalba"
+                            description: "Užduoties sąlyga lietuvių kalba"
                         },
                         options: {
                             type: "ARRAY",
                             items: { type: "STRING" },
-                            description: "Lygiai 4 pasirinkimo variantai"
+                            description: "4 pasirinkimo variantai (multiple_choice ir image_snippet)"
                         },
                         correctAnswerIndex: {
                             type: "INTEGER",
-                            description: "Teisingo atsakymo indeksas (nuo 0 iki 3)"
+                            description: "Teisingo varianto indeksas 0-3 (multiple_choice ir image_snippet)"
+                        },
+                        hotspotArea: {
+                            type: "OBJECT",
+                            properties: {
+                                ymin: { type: "INTEGER" },
+                                xmin: { type: "INTEGER" },
+                                ymax: { type: "INTEGER" },
+                                xmax: { type: "INTEGER" },
+                                label: { type: "STRING" }
+                            },
+                            description: "Normalizuotos teisingos zonos koordinatės (0-1000)"
+                        },
+                        snippetArea: {
+                            type: "OBJECT",
+                            properties: {
+                                ymin: { type: "INTEGER" },
+                                xmin: { type: "INTEGER" },
+                                ymax: { type: "INTEGER" },
+                                xmax: { type: "INTEGER" }
+                            },
+                            description: "Normalizuotos iškerpamo fragmento koordinatės (0-1000)"
+                        },
+                        items: {
+                            type: "ARRAY",
+                            items: { type: "STRING" },
+                            description: "4 rikiuojami elementai (ordering tipo užduočiai)"
+                        },
+                        correctOrder: {
+                            type: "ARRAY",
+                            items: { type: "INTEGER" },
+                            description: "Teisinga elementų tvarka (ordering tipo užduočiai)"
                         },
                         explanation: {
                             type: "STRING",
-                            description: "Trumpas paaiškinimas lietuvių kalba, kodėl pasirinktas atsakymas yra teisingas"
+                            description: "Išsamus paaiškinimas lietuvių kalba"
                         }
                     },
-                    required: ["question", "options", "correctAnswerIndex", "explanation"]
+                    required: ["type", "question", "explanation"]
                 }
             }
         }
@@ -902,22 +1062,34 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
             throw new Error("Nepavyko gauti atsakymo iš Gemini AI.");
         }
 
-        // Parse questions JSON
         const questions = JSON.parse(responseText);
         if (!Array.isArray(questions) || questions.length === 0) {
             throw new Error("Gemini AI nesugeneravo tinkamo klausimų masyvo.");
         }
 
-        // Validate options length to make sure we don't have broken cards
+        // Validate and normalize all questions
         state.questions = questions.map(q => {
-            let opts = q.options || [];
+            const validTypes = ['multiple_choice', 'hotspot', 'ordering', 'image_snippet'];
+            const type = validTypes.includes(q.type) ? q.type : 'multiple_choice';
+
+            let opts = Array.isArray(q.options) ? [...q.options] : [];
             while (opts.length < 4) opts.push("Nepateikta");
             if (opts.length > 4) opts.length = 4;
-            
+
+            let items = Array.isArray(q.items) && q.items.length >= 2 ? [...q.items] : ["1 etapas", "2 etapas", "3 etapas", "4 etapas"];
+            let correctOrder = Array.isArray(q.correctOrder) && q.correctOrder.length === items.length
+                ? q.correctOrder
+                : items.map((_, i) => i);
+
             return {
-                question: q.question || "Nenurodytas klausimas",
+                type: type,
+                question: q.question || "Užduotis",
                 options: opts,
                 correctAnswerIndex: (typeof q.correctAnswerIndex === 'number' && q.correctAnswerIndex >= 0 && q.correctAnswerIndex < 4) ? q.correctAnswerIndex : 0,
+                hotspotArea: q.hotspotArea || null,
+                snippetArea: q.snippetArea || null,
+                items: items,
+                correctOrder: correctOrder,
                 explanation: q.explanation || "Paaiškinimas nepateiktas."
             };
         });
@@ -926,57 +1098,51 @@ Pateik atsakymą TIK JSON formatu pagal nurodytą schemą.`;
 
     } catch (err) {
         console.error(err);
-        alert(`Klaida generuojant testą: ${err.message}\n\nPastaba: Generuojama net 20 klausimų, todėl įsitikinkite, kad API raktas veikia ir užklausai pakanka laiko.`);
+        alert(`Klaida generuojant testą: ${err.message}\n\nĮsitikinkite, kad API raktas teisingas ir interneto ryšys veikia.`);
         switchScreen('config');
     }
 }
 
-// Adjusted fake progress animation during loading screen for 20 questions (medium waiting, ~20s max)
+// Adjusted progress animation during loading screen for 20 questions (~20s max)
 let progressInterval;
 function animateProgressBar() {
     let progress = 0;
     elements.loadingProgressBar.style.width = '0%';
-    elements.loadingStatusText.textContent = "Jungiamasi su Gemini AI...";
+    elements.loadingStatusText.textContent = `Analizuojamas infografikas ir ruošiamos ${state.selectedGrade} klasės užduotys...`;
 
-    const statuses = [
-        { time: 1000, text: "Nuskaitomas pasirinktas infografikas..." },
-        { time: 3000, text: "Gemini AI analizuoja vizualinę informaciją..." },
-        { time: 6000, text: "Kuriama 20 klausimų sistema lietuvių kalba..." },
-        { time: 10000, text: "Generuojami atsakymų variantai kiekvienam klausimui..." },
-        { time: 13000, text: "Ruošiami teisingų atsakymų paaiškinimai..." },
-        { time: 16000, text: "Struktūrizuojami testo duomenys JSON formatu..." }
-    ];
-
-    clearInterval(progressInterval);
-    
     const startTime = Date.now();
+    clearInterval(progressInterval);
+
     progressInterval = setInterval(() => {
         const elapsed = Date.now() - startTime;
         
-        // Fill progress slowly up to 96% over 18s
+        if (elapsed > 4000 && elapsed < 9000) {
+            elements.loadingStatusText.textContent = "Kuriami grafiniai klausimai ir infografiko fragmentai...";
+        } else if (elapsed >= 9000 && elapsed < 14000) {
+            elements.loadingStatusText.textContent = "Tikrinami atsakymų variantai ir paaiškinimai...";
+        } else if (elapsed >= 14000) {
+            elements.loadingStatusText.textContent = "Baigiamas testo formavimas...";
+        }
+
         if (progress < 96) {
             progress = Math.min(96, (elapsed / 20000) * 100);
             elements.loadingProgressBar.style.width = `${progress}%`;
         }
-
-        // Update status texts
-        const activeStatus = statuses.filter(s => elapsed >= s.time).pop();
-        if (activeStatus) {
-            elements.loadingStatusText.textContent = activeStatus.text;
-        }
-    }, 100);
+    }, 200);
 }
 
 /* ==========================================================================
-   QUIZ ENGINE & FLOW
+   QUIZ ENGINE & FLOW (MULTIMODAL SUPPORT)
    ========================================================================== */
+let hotspotClickHandler = null;
+let currentOrderingState = [];
+
 function startQuiz() {
     clearInterval(progressInterval);
     state.currentQuestionIndex = 0;
     state.userAnswers = new Array(state.questions.length).fill(null);
     
-    // Set UI elements
-    elements.quizSubjectBadge.textContent = `${state.activeInfographic.code} — ${state.activeInfographic.subject}`;
+    elements.quizSubjectBadge.textContent = `${state.activeInfographic.code} — ${state.activeInfographic.subject} (${state.selectedGrade} kl.)`;
     elements.totalQuestionsNum.textContent = state.questions.length;
     
     switchScreen('quiz');
@@ -989,45 +1155,88 @@ function renderQuestion(index) {
 
     // Update progress elements
     elements.currentQuestionNum.textContent = index + 1;
-    const progressPercent = ((index) / state.questions.length) * 100;
+    const progressPercent = (index / state.questions.length) * 100;
     elements.quizProgressFill.style.width = `${progressPercent}%`;
 
-    // Reset components
+    // Reset components & hide specialized containers
     elements.questionText.textContent = q.question;
     elements.optionsContainer.innerHTML = '';
+    elements.optionsContainer.classList.add('hidden');
+    if (elements.snippetContainer) elements.snippetContainer.classList.add('hidden');
+    if (elements.hotspotContainer) elements.hotspotContainer.classList.add('hidden');
+    if (elements.orderingContainer) elements.orderingContainer.classList.add('hidden');
     elements.explanationPanel.classList.add('hidden');
     elements.nextQuestionBtn.setAttribute('disabled', 'true');
-    
+
+    // Clean up previous event listeners
+    if (hotspotClickHandler && elements.hotspotWrapper) {
+        elements.hotspotWrapper.removeEventListener('click', hotspotClickHandler);
+        hotspotClickHandler = null;
+    }
+
+    // Configure question type badge and dispatch renderer
+    if (elements.questionTypeBadge) {
+        elements.questionTypeBadge.className = 'question-type-badge';
+        if (q.type === 'hotspot') {
+            elements.questionTypeBadge.classList.add('badge-hotspot');
+            elements.questionTypeBadge.textContent = '🎯 Interaktyvus žymėjimas';
+            renderHotspotQuestion(q);
+        } else if (q.type === 'ordering') {
+            elements.questionTypeBadge.classList.add('badge-ordering');
+            elements.questionTypeBadge.textContent = '🔢 Sekos rikiavimas';
+            renderOrderingQuestion(q);
+        } else if (q.type === 'image_snippet') {
+            elements.questionTypeBadge.classList.add('badge-snippet');
+            elements.questionTypeBadge.textContent = '🔍 Fragmento analizė';
+            renderSnippetQuestion(q);
+        } else {
+            elements.questionTypeBadge.textContent = 'Pasirinkimo klausimas';
+            renderMultipleChoiceQuestion(q);
+        }
+    } else {
+        renderMultipleChoiceQuestion(q);
+    }
+
+    const card = document.querySelector('.question-card');
+    if (card) {
+        card.classList.remove('animate-fade-in');
+        void card.offsetWidth;
+        card.classList.add('animate-fade-in');
+    }
+}
+
+/* 1. Multiple Choice Renderer */
+function renderMultipleChoiceQuestion(q) {
+    elements.optionsContainer.classList.remove('hidden');
     const letters = ['A', 'B', 'C', 'D'];
 
     q.options.forEach((optText, i) => {
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'option-btn';
-        
         btn.innerHTML = `
             <span class="option-badge">${letters[i]}</span>
             <span class="option-content">${escapeHTML(optText)}</span>
         `;
-        
-        btn.addEventListener('click', () => handleOptionSelection(i));
+        btn.addEventListener('click', () => handleMultipleChoiceSelection(i));
         elements.optionsContainer.appendChild(btn);
     });
-
-    const card = document.querySelector('.question-card');
-    card.classList.remove('animate-fade-in');
-    void card.offsetWidth;
-    card.classList.add('animate-fade-in');
 }
 
-function handleOptionSelection(selectedIndex) {
+function handleMultipleChoiceSelection(selectedIndex) {
     const q = state.questions[state.currentQuestionIndex];
-    state.userAnswers[state.currentQuestionIndex] = selectedIndex;
+    const isCorrect = selectedIndex === q.correctAnswerIndex;
+    
+    state.userAnswers[state.currentQuestionIndex] = {
+        isCorrect: isCorrect,
+        selectedIndex: selectedIndex,
+        userText: q.options[selectedIndex] || '',
+        correctText: q.options[q.correctAnswerIndex] || ''
+    };
 
     const buttons = elements.optionsContainer.querySelectorAll('.option-btn');
     buttons.forEach((btn, i) => {
         btn.setAttribute('disabled', 'true');
-        
         if (i === q.correctAnswerIndex) {
             btn.classList.add('correct');
         } else if (i === selectedIndex) {
@@ -1035,7 +1244,214 @@ function handleOptionSelection(selectedIndex) {
         }
     });
 
-    elements.explanationBody.textContent = q.explanation;
+    revealExplanation(q.explanation);
+}
+
+/* 2. Snippet Question Renderer */
+function renderSnippetQuestion(q) {
+    if (elements.snippetContainer) {
+        elements.snippetContainer.classList.remove('hidden');
+        cropAndDisplaySnippet(q.snippetArea);
+    }
+    renderMultipleChoiceQuestion(q);
+}
+
+function cropAndDisplaySnippet(area) {
+    if (!elements.snippetImage) return;
+    if (!area || !state.activeInfographic?.imageSrc) {
+        elements.snippetImage.src = state.activeInfographic.imageSrc;
+        return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+        const natW = img.naturalWidth || 800;
+        const natH = img.naturalHeight || 600;
+
+        const ymin = Math.max(0, Math.min(1000, area.ymin ?? 0)) / 1000 * natH;
+        const xmin = Math.max(0, Math.min(1000, area.xmin ?? 0)) / 1000 * natW;
+        const ymax = Math.max(0, Math.min(1000, area.ymax ?? 1000)) / 1000 * natH;
+        const xmax = Math.max(0, Math.min(1000, area.xmax ?? 1000)) / 1000 * natW;
+
+        const width = Math.max(20, xmax - xmin);
+        const height = Math.max(20, ymax - ymin);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, xmin, ymin, width, height, 0, 0, width, height);
+
+        elements.snippetImage.src = canvas.toDataURL('image/jpeg', 0.9);
+    };
+    img.src = state.activeInfographic.imageSrc;
+}
+
+/* 3. Hotspot Question Renderer */
+function renderHotspotQuestion(q) {
+    if (!elements.hotspotContainer) return;
+    elements.hotspotContainer.classList.remove('hidden');
+    elements.hotspotPin.classList.add('hidden');
+    elements.hotspotTargetBox.classList.add('hidden');
+    elements.hotspotTargetBox.classList.remove('wrong');
+    elements.hotspotImage.src = state.activeInfographic.imageSrc;
+
+    hotspotClickHandler = (e) => {
+        handleHotspotClick(e, q);
+    };
+    elements.hotspotWrapper.addEventListener('click', hotspotClickHandler);
+}
+
+function handleHotspotClick(e, q) {
+    const rect = elements.hotspotImage.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    if (clickX < 0 || clickY < 0 || clickX > rect.width || clickY > rect.height) {
+        return;
+    }
+
+    // Normalized coordinates 0-1000
+    const normX = (clickX / rect.width) * 1000;
+    const normY = (clickY / rect.height) * 1000;
+
+    // Pin position relative to wrapper
+    const wrapperRect = elements.hotspotWrapper.getBoundingClientRect();
+    const pinX = e.clientX - wrapperRect.left;
+    const pinY = e.clientY - wrapperRect.top;
+
+    elements.hotspotPin.style.left = `${pinX}px`;
+    elements.hotspotPin.style.top = `${pinY}px`;
+    elements.hotspotPin.classList.remove('hidden');
+
+    const area = q.hotspotArea || { ymin: 400, xmin: 400, ymax: 600, xmax: 600, label: "Teisinga vieta" };
+    // Tolerance buffer: ±60 in 1000 scale (~6% margin)
+    const tolerance = 60;
+    const isCorrect = normY >= (area.ymin - tolerance) && normY <= (area.ymax + tolerance) &&
+                      normX >= (area.xmin - tolerance) && normX <= (area.xmax + tolerance);
+
+    // Position target box over correct area
+    const boxLeft = (area.xmin / 1000) * rect.width + (rect.left - wrapperRect.left);
+    const boxTop = (area.ymin / 1000) * rect.height + (rect.top - wrapperRect.top);
+    const boxWidth = ((area.xmax - area.xmin) / 1000) * rect.width;
+    const boxHeight = ((area.ymax - area.ymin) / 1000) * rect.height;
+
+    elements.hotspotTargetBox.style.left = `${boxLeft}px`;
+    elements.hotspotTargetBox.style.top = `${boxTop}px`;
+    elements.hotspotTargetBox.style.width = `${Math.max(28, boxWidth)}px`;
+    elements.hotspotTargetBox.style.height = `${Math.max(28, boxHeight)}px`;
+    elements.hotspotTargetBox.classList.remove('hidden');
+
+    if (!isCorrect) {
+        elements.hotspotTargetBox.classList.add('wrong');
+    }
+
+    state.userAnswers[state.currentQuestionIndex] = {
+        isCorrect: isCorrect,
+        userText: isCorrect ? '✔️ Tiksliai pažymėta vieta infografike' : '❌ Pažymėta ne ta vieta',
+        correctText: area.label || 'Nurodyta teisinga vieta infografike'
+    };
+
+    if (hotspotClickHandler && elements.hotspotWrapper) {
+        elements.hotspotWrapper.removeEventListener('click', hotspotClickHandler);
+        hotspotClickHandler = null;
+    }
+
+    revealExplanation(q.explanation);
+}
+
+/* 4. Ordering Question Renderer */
+function renderOrderingQuestion(q) {
+    if (!elements.orderingContainer) return;
+    elements.orderingContainer.classList.remove('hidden');
+    elements.confirmOrderBtn.removeAttribute('disabled');
+    elements.confirmOrderBtn.textContent = 'Patvirtinti atsakymą';
+
+    currentOrderingState = q.items.map((text, idx) => ({ text, originalIndex: idx }));
+    // Shuffle items slightly
+    if (currentOrderingState.length > 2) {
+        currentOrderingState.sort(() => Math.random() - 0.5);
+    }
+
+    renderOrderingItems(q, false);
+
+    elements.confirmOrderBtn.onclick = () => {
+        handleConfirmOrder(q);
+    };
+}
+
+function renderOrderingItems(q, isLocked) {
+    elements.orderingList.innerHTML = '';
+    currentOrderingState.forEach((item, i) => {
+        const div = document.createElement('div');
+        div.className = 'ordering-item';
+        div.innerHTML = `
+            <span class="ordering-handle">${i + 1}</span>
+            <span class="ordering-text">${escapeHTML(item.text)}</span>
+            <div class="ordering-actions-btn-group">
+                <button type="button" class="btn-order-move btn-move-up" title="Kelti aukštyn" ${i === 0 || isLocked ? 'disabled' : ''}>▲</button>
+                <button type="button" class="btn-order-move btn-move-down" title="Leisti žemyn" ${i === currentOrderingState.length - 1 || isLocked ? 'disabled' : ''}>▼</button>
+            </div>
+        `;
+
+        if (!isLocked) {
+            div.querySelector('.btn-move-up').addEventListener('click', () => {
+                if (i > 0) {
+                    const temp = currentOrderingState[i];
+                    currentOrderingState[i] = currentOrderingState[i - 1];
+                    currentOrderingState[i - 1] = temp;
+                    renderOrderingItems(q, false);
+                }
+            });
+            div.querySelector('.btn-move-down').addEventListener('click', () => {
+                if (i < currentOrderingState.length - 1) {
+                    const temp = currentOrderingState[i];
+                    currentOrderingState[i] = currentOrderingState[i + 1];
+                    currentOrderingState[i + 1] = temp;
+                    renderOrderingItems(q, false);
+                }
+            });
+        }
+        elements.orderingList.appendChild(div);
+    });
+}
+
+function handleConfirmOrder(q) {
+    elements.confirmOrderBtn.setAttribute('disabled', 'true');
+    const userOrderIndices = currentOrderingState.map(item => item.originalIndex);
+    const correctOrder = Array.isArray(q.correctOrder) && q.correctOrder.length === currentOrderingState.length
+        ? q.correctOrder
+        : currentOrderingState.map((_, i) => i);
+
+    let matchesCount = 0;
+    for (let i = 0; i < correctOrder.length; i++) {
+        if (userOrderIndices[i] === correctOrder[i]) matchesCount++;
+    }
+    const isCorrect = matchesCount === correctOrder.length;
+
+    state.userAnswers[state.currentQuestionIndex] = {
+        isCorrect: isCorrect,
+        userText: currentOrderingState.map((it, i) => `${i + 1}. ${it.text}`).join(' → '),
+        correctText: correctOrder.map((origIdx, i) => `${i + 1}. ${q.items[origIdx] || ''}`).join(' → ')
+    };
+
+    // Re-render locked with colors
+    const itemsDom = elements.orderingList.querySelectorAll('.ordering-item');
+    itemsDom.forEach((dom, i) => {
+        if (userOrderIndices[i] === correctOrder[i]) {
+            dom.classList.add('correct-state');
+        } else {
+            dom.classList.add('wrong-state');
+        }
+        dom.querySelectorAll('.btn-order-move').forEach(b => b.setAttribute('disabled', 'true'));
+    });
+
+    revealExplanation(q.explanation);
+}
+
+/* Common Feedback & Next Step */
+function revealExplanation(text) {
+    elements.explanationBody.textContent = text;
     elements.explanationPanel.classList.remove('hidden');
     elements.nextQuestionBtn.removeAttribute('disabled');
     
@@ -1058,6 +1474,140 @@ function handleNextQuestion() {
 /* ==========================================================================
    RESULTS & SUITE
    ========================================================================== */
+function showResults() {
+    let score = 0;
+    state.questions.forEach((q, i) => {
+        const ans = state.userAnswers[i];
+        const isCorrect = (typeof ans === 'object' && ans !== null) 
+            ? !!ans.isCorrect 
+            : (ans === q.correctAnswerIndex);
+        if (isCorrect) score++;
+    });
+
+    const total = state.questions.length;
+    const percent = Math.round((score / total) * 100);
+
+    elements.scorePercent.textContent = `${percent}%`;
+    elements.scoreFraction.textContent = `${score} / ${total}`;
+    elements.resultSubjectVal.textContent = `${state.activeInfographic.code} (${state.activeInfographic.subject}, ${state.selectedGrade} kl.)`;
+    elements.resultGradeVal.textContent = `${score} iš ${total} teisingų`;
+
+    let title = '';
+    let subtitle = '';
+    let icon = '';
+
+    if (percent === 100) {
+        title = "Tobulas rezultatas! 🏆";
+        subtitle = "Atsakėte į visus klausimus teisingai. Puikiai įvaldėte šią temą!";
+        icon = "🏆";
+    } else if (percent >= 85) {
+        title = "Puikus rezultatas! 🌟";
+        subtitle = "Surinkote puikų balą! Jūsų analizės ir temos supratimo įgūdžiai yra stulbinantys.";
+        icon = "🌟";
+    } else if (percent >= 60) {
+        title = "Geras rezultatas! 👍";
+        subtitle = "Didžioji dalis atsakymų teisingi. Išanalizuokite klaidas atsakymų suvestinėje.";
+        icon = "👍";
+    } else {
+        title = "Reikia pasistengti! 📚";
+        subtitle = "Atsakėte į mažiau nei pusę klausimų. Rekomenduojame dar kartą atidžiai perskaityti infografiką.";
+        icon = "📚";
+    }
+
+    elements.resultTitle.textContent = title;
+    elements.resultSubtitle.textContent = subtitle;
+    elements.resultBadgeIcon.textContent = icon;
+
+    const strokeDashoffset = 251.2 - (251.2 * percent) / 100;
+    elements.resultRadialFill.style.strokeDashoffset = strokeDashoffset;
+
+    elements.reviewSection.classList.add('hidden');
+    elements.toggleReviewBtn.textContent = 'Peržiūrėti klausimus ir atsakymus';
+
+    renderReviewList();
+
+    saveSessionToHistory(score, total, percent);
+    switchScreen('result');
+}
+
+function renderReviewList() {
+    elements.reviewList.innerHTML = '';
+    const letters = ['A', 'B', 'C', 'D'];
+
+    state.questions.forEach((q, i) => {
+        const userAns = state.userAnswers[i];
+        const isCorrect = (typeof userAns === 'object' && userAns !== null)
+            ? !!userAns.isCorrect
+            : (userAns === q.correctAnswerIndex);
+        
+        const reviewItem = document.createElement('div');
+        reviewItem.className = 'review-item';
+
+        let typeLabel = 'Pasirinkimo klausimas';
+        if (q.type === 'hotspot') typeLabel = '🎯 Interaktyvus žymėjimas';
+        else if (q.type === 'ordering') typeLabel = '🔢 Sekos rikiavimas';
+        else if (q.type === 'image_snippet') typeLabel = '🔍 Fragmento analizė';
+        
+        let detailsHtml = '';
+
+        if (q.type === 'hotspot' || q.type === 'ordering') {
+            const userText = userAns?.userText || 'Neatsakyta';
+            const correctText = userAns?.correctText || q.hotspotArea?.label || 'Nurodyta teisinga tvarka';
+
+            detailsHtml = `
+                <div class="review-opt-badge ${isCorrect ? 'correct' : 'selected-wrong'}" style="margin-bottom: 0.5rem;">
+                    <span><strong>Jūsų atsakymas:</strong> ${escapeHTML(userText)}</span>
+                </div>
+                ${!isCorrect ? `
+                <div class="review-opt-badge correct">
+                    <span><strong>Teisingas sprendimas:</strong> ${escapeHTML(correctText)}</span>
+                </div>` : ''}
+            `;
+        } else {
+            // Multiple choice or image snippet
+            const userSelectedIdx = (typeof userAns === 'object' && userAns !== null) ? userAns.selectedIndex : userAns;
+            q.options.forEach((opt, optIdx) => {
+                let statusClass = '';
+                let iconMark = '';
+                
+                if (optIdx === q.correctAnswerIndex) {
+                    statusClass = 'correct';
+                    iconMark = '✔️ Teisingas';
+                } else if (optIdx === userSelectedIdx && !isCorrect) {
+                    statusClass = 'selected-wrong';
+                    iconMark = '❌ Jūsų atsakymas';
+                }
+
+                detailsHtml += `
+                    <div class="review-opt-badge ${statusClass}">
+                        <span><strong>${letters[optIdx]}:</strong> ${escapeHTML(opt)}</span>
+                        <span style="font-size: 0.8rem; font-weight: 600;">${iconMark}</span>
+                    </div>
+                `;
+            });
+        }
+
+        reviewItem.innerHTML = `
+            <div class="review-q-header">
+                <span class="review-q-num">#${i + 1}</span>
+                <span class="review-q-badge" style="font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-right: auto; margin-left: 0.5rem;">${typeLabel}</span>
+                <span class="review-status-badge ${isCorrect ? 'correct' : 'wrong'}">
+                    ${isCorrect ? 'Teisingai (+1)' : 'Neteisingai (0)'}
+                </span>
+            </div>
+            <h4 class="review-q-text">${escapeHTML(q.question)}</h4>
+            <div class="review-options">
+                ${detailsHtml}
+            </div>
+            <div class="review-explanation">
+                <strong>Paaiškinimas:</strong> ${escapeHTML(q.explanation)}
+            </div>
+        `;
+
+        elements.reviewList.appendChild(reviewItem);
+    });
+}
+
 function showResults() {
     let score = 0;
     state.questions.forEach((q, i) => {

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>InfoQuiz v2.0 — Infografikų Testų Generatorius</title>
+    <title>InfoQuiz v2.0.1 — Infografikų Testų Generatorius</title>
     <!-- Google Fonts -->
 <!-- Main Stylesheet -->
     <link rel="stylesheet" href="styles.css">
@@ -30,7 +30,7 @@
                     </defs>
                 </svg>
                 <span class="logo-text">InfoQuiz</span>
-                <span class="version-badge">v2.0</span>
+                <span class="version-badge">v2.0.1</span>
             </div>
             
             <button id="settings-btn" class="btn btn-icon btn-secondary" title="Nustatymai">
@@ -94,24 +94,41 @@
                                 </div>
                             </div>
 
-                            <!-- Step 2: Select Theme -->
+                            <!-- Step 2: Select Grade (1-12) -->
                             <div class="form-group">
-                                <label class="form-label">2. Pasirinkite temą (kodą):</label>
+                                <div class="form-label-row">
+                                    <label class="form-label">2. Pasirinkite klasę (1–12 kl.):</label>
+                                    <span class="selected-grade-badge" id="selected-grade-badge">5 klasė</span>
+                                </div>
+                                <div class="grade-tier-selector" id="grade-tier-selector">
+                                    <button type="button" class="tier-btn" data-tier="primary">1–4 kl.</button>
+                                    <button type="button" class="tier-btn active" data-tier="middle1">5–8 kl.</button>
+                                    <button type="button" class="tier-btn" data-tier="middle2">9–10 kl.</button>
+                                    <button type="button" class="tier-btn" data-tier="gymnasium">11–12 kl.</button>
+                                </div>
+                                <div class="grade-pill-grid" id="grade-pill-grid">
+                                    <!-- Dynamic 1-12 grade buttons -->
+                                </div>
+                            </div>
+
+                            <!-- Step 3: Select Theme -->
+                            <div class="form-group">
+                                <label class="form-label">3. Pasirinkite temą (kodą):</label>
                                 <div class="infographic-select-grid" id="test-theme-grid">
                                     <!-- Themes for the selected subject will be rendered here dynamically -->
                                 </div>
                             </div>
 
-                            <!-- Step 3: Generate -->
+                            <!-- Step 4: Generate -->
                             <div class="form-group" style="margin-top: 1.75rem;">
-                                <label class="form-label">3. Testo kūrimas:</label>
+                                <label class="form-label">4. Testo kūrimas:</label>
                                 <button id="generate-btn" class="btn btn-primary btn-block btn-lg" disabled>
                                     <span>Generuoti testą (20 klausimų)</span>
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                     </svg>
                                 </button>
-                                <p class="form-help" style="margin-top: 0.5rem; text-align: center;">Fiksuotas 20 klausimų testas bus sukuriamas naudojant Gemini AI.</p>
+                                <p class="form-help" style="margin-top: 0.5rem; text-align: center;">Klausimai pritaikomi pagal pasirinktą klasę ir infografiką.</p>
                             </div>
                         </div>
 
@@ -272,8 +289,47 @@
 
                         <!-- Question Card -->
                         <div class="card glass-card question-card animate-fade-in">
+                            <div class="question-type-badge-row">
+                                <span class="question-type-badge" id="question-type-badge">Pasirinkimo klausimas</span>
+                            </div>
+
                             <h3 class="question-text" id="question-text">Koks yra teisingas atsakymas?</h3>
                             
+                            <!-- 1. Snippet container (for image_snippet) -->
+                            <div class="snippet-container hidden" id="snippet-container">
+                                <div class="snippet-image-wrapper">
+                                    <img src="" alt="Iškirptas fragmentas" id="snippet-image" class="snippet-image">
+                                </div>
+                                <div class="snippet-hint">🔎 Išanalizuokite šį infografiko fragmentą ir atsakykite į klausimą</div>
+                            </div>
+
+                            <!-- 2. Hotspot container (for interactive infographic click) -->
+                            <div class="hotspot-container hidden" id="hotspot-container">
+                                <div class="hotspot-instruction" id="hotspot-instruction">
+                                    <span>👆 Spustelėkite ant infografiko vietos, kurioje pavaizduotas teisingas atsakymas</span>
+                                </div>
+                                <div class="hotspot-wrapper" id="hotspot-wrapper">
+                                    <img src="" alt="Infografikas užduočiai" id="hotspot-image" class="hotspot-image">
+                                    <div class="hotspot-target-box hidden" id="hotspot-target-box"></div>
+                                    <div class="hotspot-pin hidden" id="hotspot-pin">
+                                        <div class="pin-ring"></div>
+                                        <div class="pin-dot"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. Ordering container (for sequence ordering) -->
+                            <div class="ordering-container hidden" id="ordering-container">
+                                <p class="ordering-instruction">Rodyklėmis sudėliokite elementus teisinga seka iš viršaus į apačią:</p>
+                                <div class="ordering-list" id="ordering-list">
+                                    <!-- Items injected dynamically -->
+                                </div>
+                                <div class="ordering-actions">
+                                    <button type="button" class="btn btn-primary btn-sm" id="confirm-order-btn">Patvirtinti atsakymą</button>
+                                </div>
+                            </div>
+
+                            <!-- 4. Multiple choice options container -->
                             <div class="options-container" id="options-container">
                                 <!-- Generated options will be inserted here -->
                             </div>
@@ -393,7 +449,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <span class="settings-version-label">InfoQuiz v2.0</span>
+                <span class="settings-version-label">InfoQuiz v2.0.1</span>
                 <div class="modal-footer-actions">
                     <button type="button" class="btn btn-secondary" id="cancel-settings-btn">Atšaukti</button>
                     <button type="button" class="btn btn-primary" id="save-settings-btn">Išsaugoti</button>
