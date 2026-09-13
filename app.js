@@ -181,11 +181,11 @@ function checkApiKey() {
 
 function setupEventListeners() {
     // Settings modal events
-    elements.settingsBtn.addEventListener(', openSettingsModal);
-    elements.fixApiBtn.addEventListener(', openSettingsModal);
-    elements.closeModalBtn.addEventListener(', closeSettingsModal);
-    elements.cancelSettingsBtn.addEventListener(', closeSettingsModal);
-    elements.saveSettingsBtn.addEventListener(', saveSettings);
+    elements.settingsBtn.addEventListener('click', openSettingsModal);
+    elements.fixApiBtn.addEventListener('click', openSettingsModal);
+    elements.closeModalBtn.addEventListener('click', closeSettingsModal);
+    elements.cancelSettingsBtn.addEventListener('click', closeSettingsModal);
+    elements.saveSettingsBtn.addEventListener('click', saveSettings);
     
     elements.toggleApiKeyVisibility.addEventListener('click', () => {
         const type = elements.apiKeyInput.type === 'password' ? 'text' : 'password';
@@ -209,7 +209,7 @@ function setupEventListeners() {
     });
 
     // Generate Quiz button click
-    elements.generateBtn.addEventListener(', generateQuiz);
+    elements.generateBtn.addEventListener('click', generateQuiz);
 
     // Subject selector in test form (Step 1)
     elements.testSubjectBtns.forEach(btn => {
@@ -225,13 +225,13 @@ function setupEventListeners() {
     });
 
     // Quiz flow buttons
-    elements.nextQuestionBtn.addEventListener(', handleNextQuestion);
-    elements.selectedPreviewImage.addEventListener(', openZoomModal);
-    elements.closeZoomBtn.addEventListener(', closeZoomModal);
+    elements.nextQuestionBtn.addEventListener('click', handleNextQuestion);
+    elements.selectedPreviewImage.addEventListener('click', openZoomModal);
+    elements.closeZoomBtn.addEventListener('click', closeZoomModal);
     
     // Result screen buttons
-    elements.restartBtn.addEventListener(', startQuiz);
-    elements.goHomeBtn.addEventListener(', goToHome);
+    elements.restartBtn.addEventListener('click', startQuiz);
+    elements.goHomeBtn.addEventListener('click', goToHome);
     
     elements.toggleReviewBtn.addEventListener('click', () => {
         elements.reviewSection.classList.toggle('hidden');
@@ -550,366 +550,12 @@ async function handleLibraryFiles(files) {
         closeBtn.addEventListener('click', closeModal);
         cancelBtn.addEventListener('click', closeModal);
         saveBtn.addEventListener('click', saveAll);
-    }* ==========================================================================
-   STATE MANAGEMENT
-   ========================================================================== */
-const state = {
-    apiKey: localStorage.getItem('infoquiz_api_key') || '',
-    
-    // Test Select Tab state
-    testSelectedSubject: 'Matematika',
-    
-    // Library Tab Form state
-    libUploadedImageBase64: '',
-    libUploadedImageSrc: '',
-    libImageThumbnail: '',
-    libSelectedSubject: 'Matematika',
-
-    // Active quiz state
-    activeInfographic: null, // Holds the selected infographic object
-    questions: [],
-    currentQuestionIndex: 0,
-    userAnswers: [],
-    
-    // History
-    history: JSON.parse(localStorage.getItem('infoquiz_history')) || []
-};
-
-// IndexedDB configuration
-const dbName = "InfoQuizDB";
-const storeName = "infographics";
-
-/* ==========================================================================
-   DOM ELEMENTS
-   ========================================================================== */
-const elements = {
-    // Warnings & Settings
-    apiWarningBanner: document.getElementById('api-warning-banner'),
-    fixApiBtn: document.getElementById('fix-api-btn'),
-    settingsBtn: document.getElementById('settings-btn'),
-    settingsModal: document.getElementById('settings-modal'),
-    closeModalBtn: document.getElementById('close-modal-btn'),
-    cancelSettingsBtn: document.getElementById('cancel-settings-btn'),
-    saveSettingsBtn: document.getElementById('save-settings-btn'),
-    apiKeyInput: document.getElementById('api-key-input'),
-    toggleApiKeyVisibility: document.getElementById('toggle-api-key-visibility'),
-
-    // Tabs
-    tabBtns: document.querySelectorAll('.tab-btn'),
-    tabPanes: document.querySelectorAll('.tab-pane'),
-
-    // Screens
-    configScreen: document.getElementById('config-screen'),
-    loadingScreen: document.getElementById('loading-screen'),
-    quizScreen: document.getElementById('quiz-screen'),
-    resultScreen: document.getElementById('result-screen'),
-
-    // TEST TAB ELEMENTS
-    testSubjectBtns: document.querySelectorAll('#test-subject-selector .subject-btn'),
-    testThemeGrid: document.getElementById('test-theme-grid'),
-    previewPlaceholderPrompt: document.getElementById('preview-placeholder-prompt'),
-    selectedPreviewContainer: document.getElementById('selected-preview-container'),
-    selectedPreviewSubject: document.getElementById('selected-preview-subject'),
-    selectedPreviewImage: document.getElementById('selected-preview-image'),
-    generateBtn: document.getElementById('generate-btn'),
-    
-    // LIBRARY TAB ELEMENTS
-    addInfographicForm: document.getElementById('add-infographic-form'),
-    libCodeInput: document.getElementById('lib-code-input'),
-    libSubjectBtns: document.querySelectorAll('#lib-subject-selector .subject-btn'),
-    libDropZone: document.getElementById('lib-drop-zone'),
-    libFileInput: document.getElementById('lib-file-input'),
-    libPreviewContainer: document.getElementById('lib-preview-container'),
-    libImagePreview: document.getElementById('lib-image-preview'),
-    libRemoveImageBtn: document.getElementById('lib-remove-image-btn'),
-    libSubmitBtn: document.getElementById('lib-submit-btn'),
-    libraryGrids: {
-        'Matematika': document.getElementById('library-grid-matematika'),
-        'Gamtos mokslai': document.getElementById('library-grid-gamtos'),
-        'Istorija': document.getElementById('library-grid-istorija')
-    },
-
-    // Loading View
-    loadingProgressBar: document.getElementById('loading-progress-bar'),
-    loadingStatusText: document.getElementById('loading-status-text'),
-
-    // Quiz View
-    quizSubjectBadge: document.getElementById('quiz-subject-badge'),
-    currentQuestionNum: document.getElementById('current-question-num'),
-    totalQuestionsNum: document.getElementById('total-questions-num'),
-    quizProgressFill: document.getElementById('quiz-progress-fill'),
-    questionText: document.getElementById('question-text'),
-    optionsContainer: document.getElementById('options-container'),
-    explanationPanel: document.getElementById('explanation-panel'),
-    explanationBody: document.getElementById('explanation-body'),
-    nextQuestionBtn: document.getElementById('next-question-btn'),
-
-    // Result View
-    resultBadgeIcon: document.getElementById('result-badge-icon'),
-    resultTitle: document.getElementById('result-title'),
-    resultSubtitle: document.getElementById('result-subtitle'),
-    scorePercent: document.getElementById('score-percent'),
-    scoreFraction: document.getElementById('score-fraction'),
-    resultRadialFill: document.getElementById('result-radial-fill'),
-    resultSubjectVal: document.getElementById('result-subject-val'),
-    resultGradeVal: document.getElementById('result-grade-val'),
-    toggleReviewBtn: document.getElementById('toggle-review-btn'),
-    reviewSection: document.getElementById('review-section'),
-    reviewList: document.getElementById('review-list'),
-    restartBtn: document.getElementById('restart-btn'),
-    goHomeBtn: document.getElementById('go-home-btn'),
-
-    // Zoom Modal
-    zoomModal: document.getElementById('zoom-modal'),
-    zoomedImage: document.getElementById('zoomed-image'),
-    closeZoomBtn: document.getElementById('close-zoom-btn'),
-
-    // History
-    historyGrid: document.getElementById('history-grid')
-};
-
-/* ==========================================================================
-   INDEXED DB FUNCTIONS
-   ========================================================================== */
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(dbName, 2);
-        request.onupgradeneeded = function(e) {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(storeName)) {
-                db.createObjectStore(storeName, { keyPath: "id" });
-            }
-        };
-        request.onsuccess = function(e) {
-            resolve(e.target.result);
-        };
-        request.onerror = function(e) {
-            reject(e.target.error);
-        };
-    });
-}
-
-const withStore = async (mode, fn) => {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-        const store = db.transaction(storeName, mode).objectStore(storeName);
-        const req = fn(store);
-        if (req) {
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        } else {
-            store.transaction.oncomplete = () => resolve();
-            store.transaction.onerror = () => reject(store.transaction.error);
-        }
-    });
-};
-
-const saveInfographicToDB = o => withStore('readwrite', s => void s.put(o));
-const getAllInfographicsFromDB = () => withStore('readonly', s => s.getAll());
-const getInfographicFromDB = id => withStore('readonly', s => s.get(id));
-const deleteInfographicFromDB = id => withStore('readwrite', s => void s.delete(id));
-
-/* ==========================================================================
-   INITIALIZATION & SETTINGS
-   ========================================================================== */
-async function init() {
-    setupEventListeners();
-    checkApiKey();
-    await refreshTabsData();
-    renderHistory();
-}
-
-function checkApiKey() {
-    if (!state.apiKey) {
-        elements.apiWarningBanner.classList.remove('hidden');
-    } else {
-        elements.apiWarningBanner.classList.add('hidden');
     }
-    updateGenerateButtonState();
-}
-
-function setupEventListeners() {
-    // Settings modal events
-    elements.settingsBtn.addEventListener(', openSettingsModal);
-    elements.fixApiBtn.addEventListener(', openSettingsModal);
-    elements.closeModalBtn.addEventListener(', closeSettingsModal);
-    elements.cancelSettingsBtn.addEventListener(', closeSettingsModal);
-    elements.saveSettingsBtn.addEventListener(', saveSettings);
-    
-    elements.toggleApiKeyVisibility.addEventListener('click', () => {
-        const type = elements.apiKeyInput.type === 'password' ? 'text' : 'password';
-        elements.apiKeyInput.type = type;
-        elements.toggleApiKeyVisibility.textContent = type === 'password' ? '👁️' : '🔒';
-    });
-
-    // Tab switcher events
-    elements.tabBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const targetTab = e.target.dataset.tab;
-            
-            elements.tabBtns.forEach(b => b.classList.remove('active'));
-            elements.tabPanes.forEach(p => p.classList.add('hidden'));
-            
-            e.target.classList.add('active');
-            document.getElementById(targetTab).classList.remove('hidden');
-            
-            refreshTabsData();
-        });
-    });
-
-    // Generate Quiz button click
-    elements.generateBtn.addEventListener(', generateQuiz);
-
-    // Subject selector in test form (Step 1)
-    elements.testSubjectBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            elements.testSubjectBtns.forEach(b => b.classList.remove('active'));
-            const targetBtn = e.currentTarget;
-            targetBtn.classList.add('active');
-            state.testSelectedSubject = targetBtn.dataset.subject;
-            
-            clearSelectedInfographicPreview();
-            renderTestSelectionTab();
-        });
-    });
-
-    // Quiz flow buttons
-    elements.nextQuestionBtn.addEventListener(', handleNextQuestion);
-    elements.selectedPreviewImage.addEventListener(', openZoomModal);
-    elements.closeZoomBtn.addEventListener(', closeZoomModal);
-    
-    // Result screen buttons
-    elements.restartBtn.addEventListener(', startQuiz);
-    elements.goHomeBtn.addEventListener(', goToHome);
-    
-    elements.toggleReviewBtn.addEventListener('click', () => {
-        elements.reviewSection.classList.toggle('hidden');
-        const isHidden = elements.reviewSection.classList.contains('hidden');
-        elements.toggleReviewBtn.textContent = isHidden 
-            ? 'Peržiūrėti klausimus ir atsakymus' 
-            : 'Slėpti atsakymų suvestinę';
-            
-        if (!isHidden) {
-            elements.reviewSection.scrollIntoView({ behavior: 'smooth' });
-        }
-    });
-
-    // --- LIBRARY TAB EVENT LISTENERS ---
-    
-    // Subject selector in library form
-    elements.libSubjectBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            elements.libSubjectBtns.forEach(b => b.classList.remove('active'));
-            const targetBtn = e.currentTarget;
-            targetBtn.classList.add('active');
-            state.libSelectedSubject = targetBtn.dataset.subject;
-        });
-    });
-
-    // Library drag & drop / file selection
-    elements.libDropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        elements.libDropZone.classList.add('drag-over');
-    });
-
-    elements.libDropZone.addEventListener('dragleave', () => {
-        elements.libDropZone.classList.remove('drag-over');
-    });
-
-    elements.libDropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        elements.libDropZone.classList.remove('drag-over');
-        const files = e.dataTransfer.files;
-        handleLibraryFiles(files);
-    });
-
-    elements.libFileInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        handleLibraryFiles(files);
-    });
-
-    elements.libRemoveImageBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        clearLibraryUploadedImage();
-    });
-
-    elements.libCodeInput.addEventListener('input', () => {
-        updateLibrarySubmitButtonState();
-    });
-
-    // Save Infographic Form Submit
-    elements.addInfographicForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        saveInfographicToLibrary();
-    });
-}
-
-async function refreshTabsData() {
-    // Determine which tab is active and refresh its content
-    const activeTabBtn = document.querySelector('.tab-btn.active');
-    if (!activeTabBtn) return;
-    
-    const tabName = activeTabBtn.dataset.tab;
-    if (tabName === 'tab-tests') {
-        await renderTestSelectionTab();
-    } else if (tabName === 'tab-library') {
-        await renderLibraryTab();
-    }
-}
-
-/* ==========================================================================
-   SETTINGS MODAL MANAGEMENT
-   ========================================================================== */
-function openSettingsModal() {
-    elements.apiKeyInput.value = state.apiKey;
-    elements.settingsModal.classList.remove('hidden');
-}
-
-function closeSettingsModal() {
-    elements.settingsModal.classList.add('hidden');
-}
-
-function saveSettings() {
-    const newKey = elements.apiKeyInput.value.trim();
-    state.apiKey = newKey;
-    localStorage.setItem('infoquiz_api_key', newKey);
-    checkApiKey();
-    closeSettingsModal();
 }
 
 /* ==========================================================================
    LIBRARY TAB LOGIC
    ========================================================================== */
-function parseFilename(file) {
-    const filename = file.name || file; // fallback if string is passed
-    const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
-    
-    let subject = state.libSelectedSubject;
-    const SUBJECT_PATTERNS = [
-        [/\bmatematik/i, 'Matematika'],
-        [/\b(gamtos|gamta)\b/i, 'Gamtos mokslai'],
-        [/\bistorij/i, 'Istorija']
-    ];
-
-    const pathToCheck = (typeof file === 'object' && file.webkitRelativePath) ? file.webkitRelativePath : filename;
-    
-    for (const [pattern, sub] of SUBJECT_PATTERNS) {
-        if (pattern.test(pathToCheck)) {
-            subject = sub;
-            break;
-        }
-    }
-    
-    const codeMatch = nameWithoutExt.match(/(\d+[\.\-_]\d+)/);
-    let code = '';
-    if (codeMatch) {
-        code = codeMatch[1].replace(/[-_]/g, '.');
-    } else {
-        code = nameWithoutExt.trim().substring(0, 15);
-    }
-    return { code, subject };
-}
-
 function clearLibraryUploadedImage() {
     state.libUploadedImageBase64 = '';
     state.libUploadedImageSrc = '';
