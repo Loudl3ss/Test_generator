@@ -4,7 +4,9 @@
   "description": "InfoQuiz – Infografikų Testų Generatorius su Google Gemini",
   "main": "app.js",
   "scripts": {
-    "start": "python3 -m http.server 8000"
+    "start": "python3 -m http.server 8000",
+    "test": "brave-test http://localhost:8000/ --check-errors",
+    "test:brave": "brave-test http://localhost:8000/ --check-errors"
   },
   "keywords": [
     "quiz",

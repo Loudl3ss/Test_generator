@@ -71,6 +71,8 @@ const elements = {
     selectedPreviewContainer: document.getElementById('selected-preview-container'),
     selectedPreviewSubject: document.getElementById('selected-preview-subject'),
     selectedPreviewImage: document.getElementById('selected-preview-image'),
+    selectedPreviewZone: document.getElementById('selected-preview-zone'),
+    testQuickFileInput: document.getElementById('test-quick-file-input'),
     generateBtn: document.getElementById('generate-btn'),
     
     // LIBRARY TAB ELEMENTS
@@ -140,6 +142,33 @@ const elements = {
 };
 
 /* ==========================================================================
+   NOTIFICATION SYSTEM (TOAST)
+   ========================================================================== */
+function showToast(message, type = 'info', duration = 3500) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast-item toast-${type}`;
+    const icon = type === 'success' ? '✔️' : (type === 'error' ? '❌' : 'ℹ️');
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-msg">${escapeHTML(message)}</span>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('toast-fade-out');
+        setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 350);
+    }, duration);
+}
+
+/* ==========================================================================
    INDEXED DB FUNCTIONS
    ========================================================================== */
 function openDB() {
@@ -163,22 +192,29 @@ function openDB() {
 const withStore = async (mode, fn) => {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-        const store = db.transaction(storeName, mode).objectStore(storeName);
-        const req = fn(store);
-        if (req) {
+        const tx = db.transaction(storeName, mode);
+        const store = tx.objectStore(storeName);
+        let req;
+        try {
+            req = fn(store);
+        } catch (err) {
+            return reject(err);
+        }
+        if (req && typeof req.onsuccess !== 'undefined') {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         } else {
-            store.transaction.oncomplete = () => resolve();
-            store.transaction.onerror = () => reject(store.transaction.error);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+            tx.onabort = () => reject(tx.error);
         }
     });
 };
 
-const saveInfographicToDB = o => withStore('readwrite', s => void s.put(o));
+const saveInfographicToDB = o => withStore('readwrite', s => s.put(o));
 const getAllInfographicsFromDB = () => withStore('readonly', s => s.getAll());
 const getInfographicFromDB = id => withStore('readonly', s => s.get(id));
-const deleteInfographicFromDB = id => withStore('readwrite', s => void s.delete(id));
+const deleteInfographicFromDB = id => withStore('readwrite', s => s.delete(id));
 
 /* ==========================================================================
    INITIALIZATION & SETTINGS
@@ -362,41 +398,95 @@ function setupEventListeners() {
     });
 
     // Library drag & drop / file selection
-    elements.libDropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        elements.libDropZone.classList.add('drag-over');
+    if (elements.libDropZone) {
+        elements.libDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.libDropZone.classList.add('drag-over');
+        });
+
+        elements.libDropZone.addEventListener('dragleave', () => {
+            elements.libDropZone.classList.remove('drag-over');
+        });
+
+        elements.libDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.libDropZone.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            handleLibraryFiles(files);
+        });
+    }
+
+    if (elements.libFileInput) {
+        elements.libFileInput.addEventListener('change', (e) => {
+            const files = e.target.files;
+            handleLibraryFiles(files);
+        });
+    }
+
+    // Quick upload on Test tab
+    if (elements.testQuickFileInput) {
+        elements.testQuickFileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleLibraryFiles(e.target.files, {
+                    subject: state.testSelectedSubject,
+                    autoSelect: true
+                });
+                e.target.value = '';
+            }
+        });
+    }
+
+    // Selected Preview Zone Drag & Drop on Test tab
+    if (elements.selectedPreviewZone) {
+        elements.selectedPreviewZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            elements.selectedPreviewZone.classList.add('drag-over');
+        });
+
+        elements.selectedPreviewZone.addEventListener('dragleave', () => {
+            elements.selectedPreviewZone.classList.remove('drag-over');
+        });
+
+        elements.selectedPreviewZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            elements.selectedPreviewZone.classList.remove('drag-over');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleLibraryFiles(e.dataTransfer.files, {
+                    subject: state.testSelectedSubject,
+                    autoSelect: true
+                });
+            }
+        });
+    }
+
+    // Prevent default browser file drop outside dropzones
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+        if (!e.target.closest('#lib-drop-zone') && !e.target.closest('#selected-preview-zone')) {
+            e.preventDefault();
+        }
     });
 
-    elements.libDropZone.addEventListener('dragleave', () => {
-        elements.libDropZone.classList.remove('drag-over');
-    });
+    if (elements.libRemoveImageBtn) {
+        elements.libRemoveImageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            clearLibraryUploadedImage();
+        });
+    }
 
-    elements.libDropZone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        elements.libDropZone.classList.remove('drag-over');
-        const files = e.dataTransfer.files;
-        handleLibraryFiles(files);
-    });
-
-    elements.libFileInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        handleLibraryFiles(files);
-    });
-
-    elements.libRemoveImageBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        clearLibraryUploadedImage();
-    });
-
-    elements.libCodeInput.addEventListener('input', () => {
-        updateLibrarySubmitButtonState();
-    });
+    if (elements.libCodeInput) {
+        elements.libCodeInput.addEventListener('input', () => {
+            updateLibrarySubmitButtonState();
+        });
+    }
 
     // Save Infographic Form Submit
-    elements.addInfographicForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        saveInfographicToLibrary();
-    });
+    if (elements.addInfographicForm) {
+        elements.addInfographicForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            saveInfographicToLibrary();
+        });
+    }
 }
 
 async function refreshTabsData() {
@@ -436,13 +526,13 @@ function saveSettings() {
    LIBRARY TAB LOGIC
    ========================================================================== */
 function parseFilename(file) {
-    const filename = file.name || file; // fallback if string is passed
+    const filename = (typeof file === 'string') ? file : (file.name || '');
     const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
     
-    let subject = state.libSelectedSubject;
+    let subject = state.testSelectedSubject || state.libSelectedSubject || 'Matematika';
     const SUBJECT_PATTERNS = [
         [/\bmatematik/i, 'Matematika'],
-        [/\b(gamtos|gamta)\b/i, 'Gamtos mokslai'],
+        [/\b(gamtos|gamta|biolog|geograf|fizik|chemij)/i, 'Gamtos mokslai'],
         [/\bistorij/i, 'Istorija']
     ];
 
@@ -460,7 +550,11 @@ function parseFilename(file) {
     if (codeMatch) {
         code = codeMatch[1].replace(/[-_]/g, '.');
     } else {
-        code = nameWithoutExt.trim().substring(0, 15);
+        code = nameWithoutExt.replace(/[^\p{L}\p{N}._\- ]/gu, '').trim();
+        if (code.length > 35) code = code.substring(0, 35).trim();
+    }
+    if (!code) {
+        code = 'Infografikas ' + new Date().toLocaleDateString('lt-LT');
     }
     return { code, subject };
 }
@@ -473,28 +567,29 @@ async function fileToInfographic(file, subject, code) {
             img.onload = function() {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                canvas.width = 60;
-                canvas.height = 60;
+                canvas.width = 120;
+                canvas.height = 120;
                 
                 const size = Math.min(img.width, img.height);
                 const sx = (img.width - size) / 2;
                 const sy = (img.height - size) / 2;
-                ctx.drawImage(img, sx, sy, size, size, 0, 0, 60, 60);
+                ctx.drawImage(img, sx, sy, size, size, 0, 0, 120, 120);
                 
-                const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-                const imageBase64 = e.target.result.split(',')[1];
+                const thumbnail = canvas.toDataURL('image/jpeg', 0.85);
+                const fullDataUrl = e.target.result;
+                const imageBase64 = fullDataUrl.split(',')[1] || '';
                 
                 resolve({
                     id: `${subject}_${code}`,
                     code: code,
                     subject: subject,
-                    imageSrc: e.target.result,
+                    imageSrc: fullDataUrl,
                     imageBase64: imageBase64,
                     thumbnail: thumbnail,
                     addedAt: new Date().toISOString()
                 });
             };
-            img.onerror = () => reject(new Error('Nepavyko įkelti nuotraukos'));
+            img.onerror = () => reject(new Error('Nepavyko perskaityti paveikslėlio'));
             img.src = e.target.result;
         };
         reader.onerror = () => reject(new Error('Klaida skaitant failą'));
@@ -502,20 +597,25 @@ async function fileToInfographic(file, subject, code) {
     });
 }
 
-async function handleLibraryFiles(files) {
+async function handleLibraryFiles(files, options = {}) {
+    if (!files || files.length === 0) return;
+
     if (files.length === 1) {
         const file = files[0];
         if (!file.type.startsWith('image/')) {
-            alert('Įkelkite tik paveikslėlio bylą (PNG, JPG, JPEG, WEBP).');
+            showToast('Įkelkite tik paveikslėlio bylą (PNG, JPG, JPEG, WEBP).', 'error');
             return;
         }
 
         const parsed = parseFilename(file);
-        elements.libCodeInput.value = parsed.code;
-        state.libSelectedSubject = parsed.subject;
+        const subject = options.subject || parsed.subject || state.libSelectedSubject;
+        const code = parsed.code;
+
+        if (elements.libCodeInput) elements.libCodeInput.value = code;
+        state.libSelectedSubject = subject;
         
         elements.libSubjectBtns.forEach(btn => {
-            if (btn.dataset.subject === parsed.subject) {
+            if (btn.dataset.subject === subject) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
@@ -523,17 +623,33 @@ async function handleLibraryFiles(files) {
         });
 
         try {
-            const infographic = await fileToInfographic(file, parsed.subject, parsed.code);
+            const infographic = await fileToInfographic(file, subject, code);
             state.libUploadedImageSrc = infographic.imageSrc;
-            elements.libImagePreview.src = state.libUploadedImageSrc;
-            elements.libPreviewContainer.classList.remove('hidden');
+            if (elements.libImagePreview) elements.libImagePreview.src = state.libUploadedImageSrc;
+            if (elements.libPreviewContainer) elements.libPreviewContainer.classList.remove('hidden');
             
             state.libUploadedImageBase64 = infographic.imageBase64;
             state.libImageThumbnail = infographic.thumbnail;
             
             updateLibrarySubmitButtonState();
+
+            // Auto-save to IndexedDB so user doesn't wonder why it's not saved!
+            await saveInfographicToDB(infographic);
+            
+            // Refresh both library grid & test selection tab immediately!
+            await renderLibraryTab();
+            await renderTestSelectionTab();
+
+            // If autoSelect requested (e.g. from test tab quick upload or drop)
+            if (options.autoSelect) {
+                state.testSelectedSubject = subject;
+                await selectInfographicForTest(infographic.id);
+            }
+
+            showToast(`✔️ Infografikas „${code}“ sėkmingai išsaugotas!`, 'success');
         } catch (err) {
             console.error(err);
+            showToast(`Klaida įkeliant: ${err.message}`, 'error');
         }
     } else if (files.length > 1) {
         let pendingImports = [];
@@ -648,7 +764,7 @@ async function handleLibraryFiles(files) {
             document.body.removeChild(overlay);
             await renderLibraryTab();
             await renderTestSelectionTab();
-            alert(`Importavimas baigtas!\n\nSėkmingai išsaugota: ${successCount}\nNepavyko (įskaitant ankstesnes klaidas): ${failedCount}`);
+            showToast(`✔️ Sėkmingai importuota ${successCount} infografikų!`, 'success');
         };
 
         closeBtn.addEventListener('click', closeModal);
@@ -664,14 +780,14 @@ function clearLibraryUploadedImage() {
     state.libUploadedImageBase64 = '';
     state.libUploadedImageSrc = '';
     state.libImageThumbnail = '';
-    elements.libFileInput.value = '';
-    elements.libPreviewContainer.classList.add('hidden');
-    elements.libImagePreview.src = '';
+    if (elements.libFileInput) elements.libFileInput.value = '';
+    if (elements.libPreviewContainer) elements.libPreviewContainer.classList.add('hidden');
+    if (elements.libImagePreview) elements.libImagePreview.src = '';
     updateLibrarySubmitButtonState();
 }
 
 function updateLibrarySubmitButtonState() {
-    const code = elements.libCodeInput.value.trim();
+    const code = elements.libCodeInput ? elements.libCodeInput.value.trim() : '';
     if (code && state.libUploadedImageBase64 && state.libImageThumbnail) {
         elements.libSubmitBtn.removeAttribute('disabled');
     } else {
@@ -681,14 +797,13 @@ function updateLibrarySubmitButtonState() {
 
 async function saveInfographicToLibrary() {
     const code = elements.libCodeInput.value.trim();
-    if (!code || !state.libUploadedImageBase64) return;
-
-    // Check if code contains characters or numbers only
-    const cleanCode = code.replace(/[^a-zA-Z0-9.\-_ ]/g, '').trim();
-    if (!cleanCode) {
-        alert("Įveskite tinkamą kodą (gali būti skaičiai, raidės, taškai, brūkšneliai).");
+    if (!code || !state.libUploadedImageBase64) {
+        showToast('Pasirinkite nuotrauką ir įveskite kodą / pavadinimą.', 'error');
         return;
     }
+
+    // Preserve Lithuanian characters, numbers, dots, spaces, hyphens
+    const cleanCode = code.replace(/[^\p{L}\p{N}._\- ]/gu, '').trim() || 'Infografikas';
 
     const newInfographic = {
         id: `${state.libSelectedSubject}_${cleanCode}`,
@@ -696,22 +811,21 @@ async function saveInfographicToLibrary() {
         subject: state.libSelectedSubject,
         imageBase64: state.libUploadedImageBase64,
         imageSrc: state.libUploadedImageSrc,
-        thumbnail: state.libImageThumbnail
+        thumbnail: state.libImageThumbnail,
+        addedAt: new Date().toISOString()
     };
 
     try {
         await saveInfographicToDB(newInfographic);
         
-        // Reset form
-        elements.libCodeInput.value = '';
-        clearLibraryUploadedImage();
-        
-        // Refresh grid
+        // Refresh both library grid & test selection tab
         await renderLibraryTab();
-        alert(`Infografikas „${cleanCode}“ sėkmingai išsaugotas bibliotekoje!`);
+        await renderTestSelectionTab();
+        
+        showToast(`✔️ Infografikas „${cleanCode}“ sėkmingai išsaugotas bibliotekoje!`, 'success');
     } catch (err) {
         console.error(err);
-        alert(`Klaida saugant duomenis: ${err.message}`);
+        showToast(`Klaida saugant duomenis: ${err.message}`, 'error');
     }
 }
 
@@ -784,6 +898,7 @@ async function renderLibraryTab() {
                         }
                         await renderLibraryTab();
                         await renderTestSelectionTab();
+                        showToast(`🗑️ Infografikas „${codeToDelete}“ pašalintas.`, 'info');
                     }
                 });
 

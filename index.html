@@ -113,7 +113,18 @@
 
                             <!-- Step 3: Select Theme -->
                             <div class="form-group">
-                                <label class="form-label">3. Pasirinkite temą (kodą):</label>
+                                <div class="form-label-row">
+                                    <label class="form-label">3. Pasirinkite temą (kodą):</label>
+                                    <label class="quick-upload-label" for="test-quick-file-input" title="Įkelti naują infografiką">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        <span>+ Įkelti PNG/JPG</span>
+                                    </label>
+                                    <input type="file" id="test-quick-file-input" accept="image/*" class="file-input hidden">
+                                </div>
                                 <div class="infographic-select-grid" id="test-theme-grid">
                                     <!-- Themes for the selected subject will be rendered here dynamically -->
                                 </div>
@@ -142,7 +153,7 @@
                                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
                                         <polyline points="21 15 16 10 5 21"></polyline>
                                     </svg>
-                                    <p>Pasirinkite dalyką ir temą kairėje, kad pamatytumėte peržiūrą</p>
+                                    <p>Pasirinkite dalyką ir temą kairėje arba <strong>nutempkite PNG infografiką čia</strong></p>
                                 </div>
                                 <div class="preview-image-container hidden" id="selected-preview-container">
                                     <div class="preview-metadata">
