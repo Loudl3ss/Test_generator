@@ -1,0 +1,17 @@
+{
+  "name": "infoquiz",
+  "version": "2.0.0",
+  "description": "InfoQuiz – Infografikų Testų Generatorius su Google Gemini",
+  "main": "app.js",
+  "scripts": {
+    "start": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "quiz",
+    "infographics",
+    "education",
+    "gemini-ai"
+  ],
+  "author": "",
+  "license": "MIT"
+}
