@@ -1734,11 +1734,13 @@ function showResults() {
     });
 
     const total = state.questions.length;
-    const percent = Math.round((score / total) * 100);
+    const percent = total > 0 ? Math.round((score / total) * 100) : 0;
 
     elements.scorePercent.textContent = `${percent}%`;
     elements.scoreFraction.textContent = `${score} / ${total}`;
-    elements.resultSubjectVal.textContent = `${state.activeInfographic.code} (${state.activeInfographic.subject}, ${state.selectedGrade} kl.)`;
+    const code = state.activeInfographic ? state.activeInfographic.code : 'Testas';
+    const subj = state.activeInfographic ? state.activeInfographic.subject : '';
+    elements.resultSubjectVal.textContent = `${code} (${subj}, ${state.selectedGrade} kl.)`;
     elements.resultGradeVal.textContent = `${score} iš ${total} teisingų`;
 
     let title = '';
@@ -1815,13 +1817,15 @@ function renderReviewList() {
         } else {
             // Multiple choice or image snippet
             const userSelectedIdx = (typeof userAns === 'object' && userAns !== null) ? userAns.selectedIndex : userAns;
+            const hasAnswered = userSelectedIdx !== null && userSelectedIdx !== undefined;
+
             q.options.forEach((opt, optIdx) => {
                 let statusClass = '';
                 let iconMark = '';
                 
                 if (optIdx === q.correctAnswerIndex) {
                     statusClass = 'correct';
-                    iconMark = '✔️ Teisingas';
+                    iconMark = (optIdx === userSelectedIdx) ? '✔️ Jūsų pasirinktas (Teisingas)' : '✔️ Teisingas atsakymas';
                 } else if (optIdx === userSelectedIdx && !isCorrect) {
                     statusClass = 'selected-wrong';
                     iconMark = '❌ Jūsų atsakymas';
@@ -1841,13 +1845,17 @@ function renderReviewList() {
             ? '<span class="review-q-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(99, 102, 241, 0.2); color: #c7d2fe; margin-left: 0.4rem;">📊 Pagrįstas infografiku</span>'
             : '<span class="review-q-badge" style="font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-left: 0.4rem;">📖 Teorinis</span>';
 
+        const statusLabel = isCorrect 
+            ? 'Teisingai (+1)' 
+            : (userAns === null || userAns === undefined ? 'Neatsakyta (0)' : 'Neteisingai (0)');
+
         reviewItem.innerHTML = `
             <div class="review-q-header">
                 <span class="review-q-num">#${i + 1}</span>
                 <span class="review-q-badge" style="font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px; background: rgba(255,255,255,0.06); color: var(--text-secondary); margin-left: 0.5rem;">${typeLabel}</span>
                 ${infoBadge}
                 <span class="review-status-badge ${isCorrect ? 'correct' : 'wrong'}" style="margin-left: auto;">
-                    ${isCorrect ? 'Teisingai (+1)' : 'Neteisingai (0)'}
+                    ${statusLabel}
                 </span>
             </div>
             <h4 class="review-q-text">${escapeHTML(q.question)}</h4>
@@ -1859,115 +1867,6 @@ function renderReviewList() {
             </div>
         `;
 
-        elements.reviewList.appendChild(reviewItem);
-    });
-}
-
-function showResults() {
-    let score = 0;
-    state.questions.forEach((q, i) => {
-        if (state.userAnswers[i] === q.correctAnswerIndex) {
-            score++;
-        }
-    });
-
-    const total = state.questions.length;
-    const percent = Math.round((score / total) * 100);
-
-    elements.scorePercent.textContent = `${percent}%`;
-    elements.scoreFraction.textContent = `${score} / ${total}`;
-    elements.resultSubjectVal.textContent = `${state.activeInfographic.code} (${state.activeInfographic.subject})`;
-    elements.resultGradeVal.textContent = `${score} iš ${total} teisingų`;
-
-    let title = '';
-    let subtitle = '';
-    let icon = '';
-
-    if (percent === 100) {
-        title = "Tobulas rezultatas! 🏆";
-        subtitle = "Atsakėte į visus 20 klausimų teisingai. Jūs esate šios temos ekspertas!";
-        icon = "🏆";
-    } else if (percent >= 85) {
-        title = "Puikus rezultatas! 🌟";
-        subtitle = "Surinkote puikų balą! Jūsų analizės ir temos supratimo įgūdžiai yra stulbinantys.";
-        icon = "🌟";
-    } else if (percent >= 60) {
-        title = "Geras rezultatas! 👍";
-        subtitle = "Didžioji dalis atsakymų teisingi. Išanalizuokite klaidas atsakymų suvestinėje.";
-        icon = "👍";
-    } else {
-        title = "Reikia pasistengti! 📚";
-        subtitle = "Atsakėte į mažiau nei pusę klausimų. Rekomenduojame dar kartą atidžiai perskaityti infografiką.";
-        icon = "📚";
-    }
-
-    elements.resultTitle.textContent = title;
-    elements.resultSubtitle.textContent = subtitle;
-    elements.resultBadgeIcon.textContent = icon;
-
-    const strokeDashoffset = 251.2 - (251.2 * percent) / 100;
-    elements.resultRadialFill.style.strokeDashoffset = strokeDashoffset;
-
-    elements.reviewSection.classList.add('hidden');
-    elements.toggleReviewBtn.textContent = 'Peržiūrėti klausimus ir atsakymus';
-
-    renderReviewList();
-
-    // Save history with Selected Infographic thumbnail
-    saveSessionToHistory(score, total, percent);
-
-    switchScreen('result');
-}
-
-function renderReviewList() {
-    elements.reviewList.innerHTML = '';
-    const letters = ['A', 'B', 'C', 'D'];
-
-    state.questions.forEach((q, i) => {
-        const userAns = state.userAnswers[i];
-        const isCorrect = userAns === q.correctAnswerIndex;
-        
-        const reviewItem = document.createElement('div');
-        reviewItem.className = 'review-item';
-        
-        let optionsHtml = '';
-        q.options.forEach((opt, optIdx) => {
-            let statusClass = '';
-            let iconMark = '';
-            
-            if (optIdx === q.correctAnswerIndex) {
-                statusClass = 'correct';
-                iconMark = '✔️ Teisingas';
-            } else if (optIdx === userAns && !isCorrect) {
-                statusClass = 'selected-wrong';
-                iconMark = '❌ Jūsų atsakymas';
-            }
-
-            optionsHtml += `
-                <div class="review-opt-badge ${statusClass}">
-                    <span><strong>${letters[optIdx]}:</strong> ${escapeHTML(opt)}</span>
-                    <span style="font-size: 0.8rem; font-weight: 600;">${iconMark}</span>
-                </div>
-            `;
-        });
-
-        reviewItem.innerHTML = `
-            <div class="review-q-header">
-                <span class="review-q-num">${i + 1}.</span>
-                <span class="review-q-text">${escapeHTML(q.question)}</span>
-            </div>
-            <div class="review-options">
-                ${optionsHtml}
-            </div>
-            <div class="explanation-panel">
-                <div class="explanation-header">
-                    <span>💡</span>
-                    <strong>Paaiškinimas:</strong>
-                </div>
-                <p class="explanation-body">${escapeHTML(q.explanation)}</p>
-            </div>
-        `;
-        
         elements.reviewList.appendChild(reviewItem);
     });
 }
