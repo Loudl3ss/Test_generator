@@ -1,7 +1,10 @@
+const APP_VERSION = '2.0.0';
+
 /* ==========================================================================
    STATE MANAGEMENT
    ========================================================================== */
 const state = {
+    version: APP_VERSION,
     apiKey: localStorage.getItem('infoquiz_api_key') || '',
     
     // Test Select Tab state

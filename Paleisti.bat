@@ -1,8 +1,8 @@
 @echo off
-title InfoQuiz Serveris
+title InfoQuiz v2.0 Serveris
 chcp 65001 > nul
 echo ===================================================
-echo   Paleidžiama InfoQuiz aplikacija...
+echo   Paleidžiama InfoQuiz v2.0 aplikacija...
 echo   Naršyklė su testais atsidarys automatiškai.
 echo ===================================================
 echo.

@@ -1,6 +1,6 @@
-# InfoQuiz – Infografikų Testų Generatorius
+# InfoQuiz v2.0 – Infografikų Testų Generatorius
 
-Sveiki atvykę į **InfoQuiz**! Tai išmani programa, leidžianti automatiškai generuoti testus iš mokomųjų infografikų, naudojant „Google Gemini“ dirbtinį intelektą. 
+Sveiki atvykę į **InfoQuiz v2.0**! Tai išmani programa, leidžianti automatiškai generuoti testus iš mokomųjų infografikų, naudojant „Google Gemini“ dirbtinį intelektą. 
 
 ## 📥 Kaip atsisiųsti programą (Windows)?
 
